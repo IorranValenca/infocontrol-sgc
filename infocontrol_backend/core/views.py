@@ -1,12 +1,13 @@
-from rest_framework import viewsets, status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework import viewsets, mixins, status
+from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.db.models import ProtectedError
+from django.db.models import F
 from .models import Cliente, Produto, Venda
 from .serializers import ClienteSerializer, ProdutoSerializer, VendaSerializer, VendaCriacaoSerializer
 from .services import VendaService, RelatorioService
 from .exceptions import RegraNegocioException
+
 
 class ClienteViewSet(viewsets.ModelViewSet):
     queryset = Cliente.objects.all().order_by('id')
@@ -15,13 +16,8 @@ class ClienteViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         cliente = self.get_object()
-
         if cliente.vendas.exists():
-            return Response(
-                {'erro': 'Cliente não pode ser removido pois possui vendas registradas.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
+            raise RegraNegocioException('Cliente não pode ser removido pois possui vendas registradas.')
         return super().destroy(request, *args, **kwargs)
 
 
@@ -30,8 +26,24 @@ class ProdutoViewSet(viewsets.ModelViewSet):
     serializer_class = ProdutoSerializer
     permission_classes = [IsAuthenticated]
 
+    def destroy(self, request, *args, **kwargs):
+        produto = self.get_object()
+        if produto.itemvenda_set.exists():
+            raise RegraNegocioException('Produto não pode ser removido pois está vinculado a vendas registradas.')
+        return super().destroy(request, *args, **kwargs)
 
-class VendaViewSet(viewsets.ReadOnlyModelViewSet):
+    @action(detail=False, methods=['get'], url_path='estoque-baixo')
+    def estoque_baixo(self, request):
+        produtos = Produto.objects.filter(quantidade_estoque__lte=F('estoque_minimo')).order_by('id')
+        return Response(ProdutoSerializer(produtos, many=True).data)
+
+
+class VendaViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet
+):
     queryset = Venda.objects.all().order_by('-data_venda')
     serializer_class = VendaSerializer
     permission_classes = [IsAuthenticated]
@@ -89,3 +101,11 @@ def relatorio_vendas_anuais(request):
         'ano': ano,
         'dados': dados
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def relatorio_produtos_mais_vendidos(request):
+    dados = RelatorioService.produtos_mais_vendidos()
+
+    return Response({'produtos': dados})

@@ -7,6 +7,7 @@ from .views import (
     relatorio_vendas_periodo,
     relatorio_vendas_cliente,
     relatorio_vendas_anuais,
+    relatorio_produtos_mais_vendidos,
 )
 
 router = DefaultRouter()
@@ -19,4 +20,5 @@ urlpatterns = [
     path('relatorios/vendas/', relatorio_vendas_periodo),
     path('relatorios/vendas-cliente/<int:cliente_id>/', relatorio_vendas_cliente),
     path('relatorios/vendas-anuais/', relatorio_vendas_anuais),
+    path('relatorios/produtos-mais-vendidos/', relatorio_produtos_mais_vendidos),
 ]

@@ -1,7 +1,6 @@
 from decimal import Decimal
 from django.db import transaction
-from django.db.models import Sum
-from django.utils.dateparse import parse_date
+from django.db.models import Sum, Count
 from .models import Cliente, Produto, Venda, ItemVenda
 from .exceptions import RegraNegocioException
 
@@ -102,3 +101,22 @@ class RelatorioService:
             })
 
         return meses
+
+    @staticmethod
+    def produtos_mais_vendidos(limite=10):
+        resultados = (
+            ItemVenda.objects
+            .values('produto__id', 'produto__nome')
+            .annotate(total_vendido=Sum('quantidade'), total_receita=Sum('subtotal'))
+            .order_by('-total_vendido')[:limite]
+        )
+
+        return [
+            {
+                'produto_id': r['produto__id'],
+                'produto_nome': r['produto__nome'],
+                'total_vendido': r['total_vendido'],
+                'total_receita': float(r['total_receita']),
+            }
+            for r in resultados
+        ]
