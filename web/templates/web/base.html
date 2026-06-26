@@ -50,19 +50,15 @@
     /* Titulos com fonte serifada: o "ar" editorial do Claude */
     h1, h2, .card h2 { font-family: "Newsreader", Georgia, serif; font-weight: 500; letter-spacing: -.01em; }
 
-    /* Barra de navegacao: fixa no topo e levemente translucida (vidro fosco quente) */
+    /* Barra de navegacao: fixa no topo, fundo branco solido.
+       Como o PNG da logo tem fundo branco, a navbar branca o funde sem nenhuma moldura. */
     nav {
       position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--border);
-      background: rgba(255,255,255,.82); -webkit-backdrop-filter: blur(10px) saturate(120%); backdrop-filter: blur(10px) saturate(120%);
+      background: #fff;
     }
     nav .inner { max-width: 960px; margin: 0 auto; display: flex; align-items: center; gap: 4px; padding: 0 24px; height: 64px; }
-    /* A logo fica sempre sobre um "chip" branco, pois o PNG tem fundo branco */
-    nav #nav-home {
-      display: inline-flex; align-items: center; margin-right: 12px; padding: 7px 11px; border-radius: 11px;
-      background: #fff; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(45,40,30,.05); transition: box-shadow .15s;
-    }
-    nav #nav-home:hover { box-shadow: 0 3px 10px rgba(45,40,30,.10); }
-    nav .logo { height: 26px; display: block; }                          /* logo (imagem) na barra de navegacao */
+    nav #nav-home { display: inline-flex; align-items: center; margin-right: 14px; }
+    nav .logo { height: 28px; display: block; }                          /* logo (imagem) na barra de navegacao */
     .brand-logo { display: block; height: 50px; margin: 0 auto 10px; }   /* logo nas telas de login/recuperacao */
     nav a.link { color: var(--muted); font-weight: 500; font-size: 14px; padding: 7px 12px; border: 1px solid transparent; border-radius: 9px; transition: color .25s cubic-bezier(.2,.8,.2,1), background .25s cubic-bezier(.2,.8,.2,1), border-color .25s cubic-bezier(.2,.8,.2,1); }
     nav a.link:hover { color: var(--text); background: var(--hover); }
