@@ -3,30 +3,81 @@
 {% block nav %}{% endblock %}   {# Pagina publica: sem barra de navegacao #}
 
 {% block body %}
-<div class="auth-wrap">
-  <div class="auth-card">
-    <img class="brand-logo" src="{% static 'web/logo.png' %}" alt="InfoControl">
-    <div class="sub">Recuperacao de senha</div>
+<style>
+  /* ===== Recuperacao de senha: cartao central no estilo editorial Anthropic/Claude ===== */
+  .recover-page {
+    min-height: 100vh; display: grid; place-items: center; padding: 24px;
+    background: radial-gradient(1000px 520px at 50% -10%, #ffe7d2, transparent), var(--bg);
+  }
+  .recover-card {
+    width: 100%; max-width: 420px; background: #fff; border: 1px solid var(--border); border-radius: 20px;
+    padding: 38px 34px; box-shadow: 0 18px 50px rgba(80,60,40,.14);
+  }
+  .recover-logo { display: block; height: 40px; margin-bottom: 26px; }   /* logo sobre o cartao branco */
+  .recover-head h1 {
+    font-family: "Newsreader", Georgia, serif; font-weight: 500; font-size: 28px;
+    letter-spacing: -.01em; color: var(--text); margin-bottom: 8px;
+  }
+  .recover-head p { color: var(--muted); font-size: 14.5px; margin-bottom: 24px; }
+
+  /* Cada etapa do fluxo recebe um numero e um titulo */
+  .step { padding-top: 22px; border-top: 1px solid var(--border); }
+  .step:first-of-type { padding-top: 0; border-top: 0; }
+  .step-head { display: flex; align-items: center; gap: 11px; margin-bottom: 14px; }
+  .step-num {
+    flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+    background: rgba(255,117,31,.12); color: var(--primary-dark); font-size: 13px; font-weight: 700;
+  }
+  .step-head h2 { font-size: 15px; font-weight: 600; color: var(--text); margin: 0; font-family: inherit; }
+  .recover-card label { font-size: 13px; font-weight: 500; color: var(--text); }
+  .recover-card button { width: 100%; margin-top: 16px; }
+  .recover-card .ghost-line { margin-top: 12px; }
+  .recover-card .ghost-line button { background: #fff; color: var(--text); border-color: var(--border); box-shadow: none; }
+  .recover-card .ghost-line button:hover { background: var(--hover); }
+  .recover-alt { text-align: center; margin-top: 24px; font-size: 13.5px; color: var(--muted); }
+  .recover-alt a { color: var(--primary); font-weight: 500; }
+  .recover-alt a:hover { text-decoration: underline; }
+</style>
+
+<div class="recover-page">
+  <div class="recover-card">
+    <img class="recover-logo" src="{% static 'web/logo.png' %}" alt="InfoControl">
+    <div class="recover-head">
+      <h1>Recuperar acesso</h1>
+      <p>Informe seu e-mail para receber as instrucoes e, em seguida, defina uma nova senha.</p>
+    </div>
 
     <!-- Passo 1: informar o e-mail para receber o token -->
-    <form id="form-email">
-      <label>E-mail cadastrado</label>
-      <input id="email" type="email" required>
-      <button type="submit">Enviar instrucoes</button>
-    </form>
+    <div class="step">
+      <div class="step-head">
+        <span class="step-num">1</span>
+        <h2>Receber instrucoes</h2>
+      </div>
+      <form id="form-email">
+        <label for="email">E-mail cadastrado</label>
+        <input id="email" type="email" required placeholder="voce@empresa.com">
+        <button type="submit">Enviar instrucoes</button>
+      </form>
+    </div>
 
     <!-- Passo 2: informar o token recebido e a nova senha -->
-    <form id="form-reset" style="margin-top:20px">
-      <label>UID (recebido por e-mail)</label>
-      <input id="uid" required>
-      <label>Token (recebido por e-mail)</label>
-      <input id="token" required>
-      <label>Nova senha</label>
-      <input id="nova" type="password" required>
-      <button type="submit">Redefinir senha</button>
-    </form>
+    <div class="step" style="margin-top:22px">
+      <div class="step-head">
+        <span class="step-num">2</span>
+        <h2>Definir nova senha</h2>
+      </div>
+      <form id="form-reset">
+        <label for="uid">UID (recebido por e-mail)</label>
+        <input id="uid" required placeholder="Codigo UID">
+        <label for="token" style="margin-top:10px">Token (recebido por e-mail)</label>
+        <input id="token" required placeholder="Codigo do token">
+        <label for="nova" style="margin-top:10px">Nova senha</label>
+        <input id="nova" type="password" required placeholder="Sua nova senha">
+        <button type="submit">Redefinir senha</button>
+      </form>
+    </div>
 
-    <div class="alt"><a href="/">Voltar ao login</a></div>
+    <div class="recover-alt"><a href="/">&larr; Voltar ao login</a></div>
   </div>
 </div>
 {% endblock %}

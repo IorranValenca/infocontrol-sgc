@@ -3,22 +3,180 @@
 {% block nav %}{% endblock %}   {# A tela de login nao exibe a barra de navegacao #}
 
 {% block body %}
-<div class="auth-wrap">
-  <div class="auth-card">
-    <img class="brand-logo" src="{% static 'web/logo.png' %}" alt="InfoControl">
-    <div class="sub">Sistema de Gestao Comercial</div>
+<style>
+  /* ===== Tela de login: layout dividido, estilo editorial Anthropic/Claude ===== */
+  .login-page { min-height: 100vh; display: grid; grid-template-columns: 1.1fr 1fr; }
 
-    <form id="form" novalidate>
-      <label>Usuario</label>
-      <input id="username" required autofocus>
-      <label>Senha</label>
-      <input id="senha" type="password" required>
-      <div id="login-erro" role="alert" aria-live="polite" style="display:none; margin-top:12px; color:var(--danger); font-size:13px; font-weight:600;"></div>
-      <button type="submit">Entrar</button>
-    </form>
+  /* ---- Painel de marca (lado esquerdo): creme quente com brilho laranja suave ---- */
+  .login-brand {
+    position: relative; overflow: hidden; padding: 64px 60px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    background: linear-gradient(155deg, #f6efe4 0%, #f0eee6 55%, #ece5d8 100%);
+    border-right: 1px solid var(--border);
+  }
+  .login-brand::before {                                  /* brilho quente no canto superior */
+    content: ""; position: absolute; width: 520px; height: 520px; top: -170px; right: -160px;
+    border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle, rgba(255,117,31,.22), transparent 65%);
+  }
+  .login-brand::after {                                   /* segundo brilho, mais sutil, embaixo */
+    content: ""; position: absolute; width: 360px; height: 360px; bottom: -130px; left: -110px;
+    border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle, rgba(255,117,31,.10), transparent 70%);
+  }
+  .login-brand-inner { position: relative; z-index: 1; max-width: 460px; }
+  .login-headline {
+    font-family: "Newsreader", Georgia, serif; font-weight: 500; font-size: 42px;
+    line-height: 1.1; letter-spacing: -.02em; color: var(--text); margin-bottom: 20px;
+  }
+  .login-tagline { font-size: 16px; line-height: 1.6; color: var(--muted); margin-bottom: 38px; max-width: 410px; }
+  .login-features { list-style: none; display: flex; flex-direction: column; gap: 15px; }
+  .login-features li { display: flex; align-items: center; gap: 13px; font-size: 14.5px; color: var(--text); }
+  .login-features .ic {
+    flex: none; width: 27px; height: 27px; border-radius: 8px; display: grid; place-items: center;
+    background: rgba(255,117,31,.12); color: var(--primary);
+  }
+  .login-features .ic svg { width: 15px; height: 15px; }
+  .login-brand-foot { position: relative; z-index: 1; font-size: 13px; color: var(--muted); }
 
-    <div class="alt"><a href="/recuperar/">Esqueci minha senha</a></div>
-  </div>
+  /* ---- Lado direito: formulario sobre fundo branco limpo ---- */
+  .login-form-wrap { background: #fff; display: grid; place-items: center; padding: 40px; }
+  .login-form-card { width: 100%; max-width: 380px; }
+  .login-form-logo { display: block; height: 40px; margin: 0 0 26px; }   /* logo no lado do formulario */
+  .login-form-head { margin-bottom: 28px; }
+  .login-form-head h1 {
+    font-family: "Newsreader", Georgia, serif; font-weight: 500; font-size: 30px;
+    letter-spacing: -.01em; color: var(--text); margin-bottom: 8px;
+  }
+  .login-form-head p { color: var(--muted); font-size: 14.5px; }
+
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 7px; }
+  .input-wrap { position: relative; }
+  .input-wrap .input-icon {
+    position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+    width: 18px; height: 18px; color: var(--muted); pointer-events: none;
+  }
+  .login-page input {
+    width: 100%; padding: 12px 14px 12px 42px; border: 1px solid var(--border); border-radius: 11px;
+    font-size: 14.5px; font-family: inherit; color: var(--text); background: #fff;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .login-page input::placeholder { color: #b3ab9c; }
+  .login-page input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(255,117,31,.15); }
+  .input-wrap.has-toggle input { padding-right: 44px; }
+  .toggle-senha {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    width: 32px; height: 32px; padding: 0; display: grid; place-items: center;
+    background: transparent; border: 0; border-radius: 8px; color: var(--muted); cursor: pointer;
+  }
+  .toggle-senha:hover { background: var(--hover); color: var(--text); }
+  .toggle-senha svg { width: 18px; height: 18px; }
+
+  .login-erro {
+    display: none; align-items: center; gap: 9px; margin-top: 14px; padding: 11px 13px;
+    border-radius: 10px; background: #fbeae7; border: 1px solid #f1c9c1;
+    color: var(--danger); font-size: 13px; font-weight: 500;
+  }
+  .login-erro.show { display: flex; }
+  .login-erro svg { flex: none; width: 16px; height: 16px; }
+
+  .login-page button.entrar {
+    width: 100%; margin-top: 22px; display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 13px 18px; border: 1px solid transparent; border-radius: 11px;
+    font-size: 15px; font-weight: 600; font-family: inherit; background: var(--primary); color: #fff; cursor: pointer;
+    transition: transform .15s, background .15s;
+  }
+  .login-page button.entrar:hover { background: var(--primary-dark); transform: translateY(-1px); }
+  .login-page button.entrar:active { transform: translateY(0); }
+  .login-page button.entrar svg { width: 18px; height: 18px; transition: transform .15s; }
+  .login-page button.entrar:hover svg { transform: translateX(2px); }
+
+  .login-alt { text-align: center; margin-top: 22px; font-size: 13.5px; color: var(--muted); }
+  .login-alt a { color: var(--primary); font-weight: 500; }
+  .login-alt a:hover { text-decoration: underline; }
+
+  /* ---- Mobile: oculta o painel de marca e centraliza um cartao limpo ---- */
+  @media (max-width: 900px) {
+    .login-page { grid-template-columns: 1fr; }
+    .login-brand { display: none; }
+    .login-form-logo { margin: 0 auto 28px; }
+    .login-form-wrap {
+      padding: 32px 22px; min-height: 100vh;
+      background: radial-gradient(900px 480px at 50% -10%, #ffe7d2, transparent), var(--bg);
+    }
+    .login-form-card { background: #fff; border: 1px solid var(--border); border-radius: 18px; padding: 32px 26px; box-shadow: 0 18px 50px rgba(80,60,40,.12); }
+  }
+</style>
+
+<div class="login-page">
+  <!-- Painel de marca: mensagem editorial e destaques do sistema -->
+  <aside class="login-brand">
+    <div class="login-brand-inner">
+      <h2 class="login-headline">Sua operacao comercial, sob controle.</h2>
+      <p class="login-tagline">Clientes, vendas, estoque e relatorios reunidos em um so lugar, com a clareza que o seu dia a dia precisa.</p>
+      <ul class="login-features">
+        <li>
+          <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+          Vendas e estoque sempre sincronizados
+        </li>
+        <li>
+          <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+          Relatorios claros, em tempo real
+        </li>
+        <li>
+          <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+          Equipe e permissoes sob seu comando
+        </li>
+      </ul>
+    </div>
+    <div class="login-brand-foot">&copy; 2026 InfoControl &middot; Sistema de Gestao Comercial</div>
+  </aside>
+
+  <!-- Formulario de acesso -->
+  <main class="login-form-wrap">
+    <div class="login-form-card">
+      <img class="login-form-logo" src="{% static 'web/logo.png' %}" alt="InfoControl">
+      <div class="login-form-head">
+        <h1>Bem-vindo de volta</h1>
+        <p>Acesse sua conta para continuar.</p>
+      </div>
+
+      <form id="form" novalidate>
+        <div class="field">
+          <label for="username">Usuario</label>
+          <div class="input-wrap">
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <input id="username" required autofocus autocomplete="username" placeholder="Seu usuario">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="senha">Senha</label>
+          <div class="input-wrap has-toggle">
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input id="senha" type="password" required autocomplete="current-password" placeholder="Sua senha">
+            <button type="button" id="toggle-senha" class="toggle-senha" aria-label="Mostrar senha">
+              <svg class="eye-show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="eye-hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3.5 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="m2 2 20 20"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div id="login-erro" class="login-erro" role="alert" aria-live="polite">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+          <span id="login-erro-msg"></span>
+        </div>
+
+        <button type="submit" class="entrar">
+          Entrar
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </button>
+      </form>
+
+      <div class="login-alt"><a href="/recuperar/">Esqueci minha senha</a></div>
+    </div>
+  </main>
 </div>
 {% endblock %}
 
@@ -27,16 +185,25 @@
   // Ja autenticado? Vai direto para o sistema.
   if (getToken()) getMe().then((u) => location.href = homeFor(u.perfil)).catch(() => location.href = "/");
 
+  // Mostra/oculta a senha digitada.
+  document.getElementById("toggle-senha").addEventListener("click", () => {
+    const inp = document.getElementById("senha");
+    const btn = document.getElementById("toggle-senha");
+    const mostrando = inp.type === "text";
+    inp.type = mostrando ? "password" : "text";
+    btn.setAttribute("aria-label", mostrando ? "Mostrar senha" : "Ocultar senha");
+    btn.querySelector(".eye-show").style.display = mostrando ? "block" : "none";
+    btn.querySelector(".eye-hide").style.display = mostrando ? "none" : "block";
+  });
+
   function mostrarErroLogin(msg) {
-    const erro = document.getElementById("login-erro");
-    erro.textContent = msg;
-    erro.style.display = "block";
+    document.getElementById("login-erro-msg").textContent = msg;
+    document.getElementById("login-erro").classList.add("show");
   }
 
   function limparErroLogin() {
-    const erro = document.getElementById("login-erro");
-    erro.style.display = "none";
-    erro.textContent = "";
+    document.getElementById("login-erro").classList.remove("show");
+    document.getElementById("login-erro-msg").textContent = "";
   }
 
   // Envia usuario e senha para /api/auth/login/ e guarda o token retornado.
