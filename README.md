@@ -1,4 +1,4 @@
-# 🛒 InfoControl — Sistema de Gestão Comercial
+#  InfoControl — Sistema de Gestão Comercial
 
 Sistema de gestão comercial para uma **loja de informática**. Permite controlar
 clientes, produtos, estoque e vendas, com dashboard principal, relatórios e gráficos.
@@ -9,7 +9,7 @@ que consome essa API.
 
 ---
 
-## 🚀 Tutorial: rodando pela primeira vez
+##  Tutorial: rodando pela primeira vez
 
 > Pré-requisito: ter o **Python 3.10+** instalado. Confira com `python --version`.
 
@@ -54,14 +54,14 @@ python manage.py runserver
 
 ### 6. Acessar o sistema
 Abra o navegador em **http://127.0.0.1:8000/** e faça login com o usuário criado.
-Após o login, o sistema abre o **Dashboard** em **/dashboard/**. 🎉
+Após o login, o sistema abre o **Dashboard** em **/dashboard/**. 
 
 > Para parar o servidor, pressione `Ctrl + C` no terminal.
 > Nas próximas vezes, basta repetir os passos **1 (ativar)** e **5 (runserver)**.
 
 ---
 
-## 🖥️ Como usar a interface
+##  Como usar a interface
 
 | Tela | O que faz |
 |------|-----------|
@@ -73,7 +73,7 @@ Após o login, o sistema abre o **Dashboard** em **/dashboard/**. 🎉
 | **Relatórios** | Relatórios detalhados que abrem já carregados: indicadores, **gráfico** de vendas anuais, vendas por período, **produtos mais vendidos** e itens para repor. |
 | **Equipe** | Tela de administradores para criar usuários, definir perfil (**ADMIN** ou **FUNCIONARIO**), trocar senha e ativar/desativar membros. Funcionários veem apenas **Clientes** e **Vendas** no menu. |
 
-### 🔑 Recuperação de senha por e-mail
+###  Recuperação de senha por e-mail
 1. Na tela de login, clique em **"Esqueci minha senha"** e informe o e-mail.
 2. Em modo de desenvolvimento o e-mail é **exibido no terminal** onde roda o `runserver`
    (procure por `uid:` e `token:`).
@@ -84,7 +84,7 @@ Após o login, o sistema abre o **Dashboard** em **/dashboard/**. 🎉
 
 ---
 
-## 📂 Organização do projeto
+##  Organização do projeto
 
 ```
 infocontrol/
@@ -93,11 +93,11 @@ infocontrol/
 ├── database/script.sql   # Script SQL do banco (modelagem)
 ├── docs/                 # Documentação e diagramas
 │
-├── config/               # ⚙️  Configuração do projeto
+├── config/               #     Configuração do projeto
 │   ├── settings.py       #     Configurações gerais
 │   └── urls.py           #     Roteamento principal (admin / api / web)
 │
-├── api/                  # 🔌 Camada da API REST (regras de negócio)
+├── api/                  #     Camada da API REST (regras de negócio)
 │   ├── models.py         #     Tabelas: Cliente, Produto, Venda, ItemVenda, PerfilUsuario
 │   ├── serializers.py    #     Conversão e validação JSON ⇄ modelo
 │   ├── services.py       #     Regras de negócio (vendas e relatórios)
@@ -107,14 +107,14 @@ infocontrol/
 │   ├── urls.py           #     Rotas da API
 │   └── tests.py          #     25 testes automatizados
 │
-└── web/                  # 🎨 Interface web (consome a API via JavaScript)
+└── web/                  #     Interface web (consome a API via JavaScript)
     ├── views.py          #     Entrega as páginas HTML
     └── templates/web/    #     Telas: login, dashboard, clientes, produtos, vendas, relatórios, equipe
 ```
 
 ---
 
-## 🌐 API REST
+##  API REST
 
 Todas as rotas (exceto login e recuperação de senha) exigem o cabeçalho:
 `Authorization: Bearer <token>`. Toda resposta é em **JSON**.
@@ -155,7 +155,7 @@ POST /api/vendas/
 
 ---
 
-## 🧪 Testes
+##  Testes
 
 ```bash
 python manage.py test
@@ -164,7 +164,7 @@ python manage.py test
 
 ---
 
-## 🏛️ Documentação técnica
+##  Documentação técnica
 
 ### Arquitetura em camadas
 O projeto separa responsabilidades em camadas, o que facilita a manutenção:
@@ -205,9 +205,9 @@ O projeto separa responsabilidades em camadas, o que facilita a manutenção:
 
 ---
 
-## 🛠️ Tecnologias
+##  Tecnologias
 - Python 3.12 · Django 6 · Django REST Framework · SimpleJWT (JWT) · SQLite · Chart.js
 
-## 👥 Integrantes
+##  Integrantes
 - Iorran Valença
-- Gabriel Pereira
+
