@@ -1,8 +1,9 @@
 # 🛒 InfoControl — Sistema de Gestão Comercial
 
 Sistema de gestão comercial para uma **loja de informática**. Permite controlar
-clientes, produtos, estoque e vendas, com relatórios e gráficos. É composto por
-uma **API REST** (protegida por token JWT) e uma **interface web** que consome essa API.
+clientes, produtos, estoque e vendas, com dashboard principal, relatórios e gráficos.
+É composto por uma **API REST** (protegida por token JWT) e uma **interface web**
+que consome essa API.
 
 > **Identidade visual:** logotipo e nome *InfoControl* com esquema de cores próprio (laranja `#FF751F`).
 
@@ -52,7 +53,8 @@ python manage.py runserver
 ```
 
 ### 6. Acessar o sistema
-Abra o navegador em **http://127.0.0.1:8000/** e faça login com o usuário criado. 🎉
+Abra o navegador em **http://127.0.0.1:8000/** e faça login com o usuário criado.
+Após o login, o sistema abre o **Dashboard** em **/dashboard/**. 🎉
 
 > Para parar o servidor, pressione `Ctrl + C` no terminal.
 > Nas próximas vezes, basta repetir os passos **1 (ativar)** e **5 (runserver)**.
@@ -63,11 +65,13 @@ Abra o navegador em **http://127.0.0.1:8000/** e faça login com o usuário cria
 
 | Tela | O que faz |
 |------|-----------|
-| **Login** | Autentica o usuário e guarda o token JWT no navegador. |
+| **Login** | Autentica o usuário, guarda o token JWT no navegador e redireciona para o Dashboard. |
+| **Dashboard** | Tela principal com visão geral de clientes, produtos, estoque, vendas, receita, ticket médio, gráfico anual, vendas recentes, produtos mais vendidos, estoque baixo e clientes recentes. Inclui um botão **+** que abre ações rápidas orbitando o botão: cliente, produto e venda. |
 | **Clientes** | Cadastra, edita e remove clientes. |
 | **Produtos** | Catálogo com **marca**, **categoria** e **garantia**; busca e filtro por categoria, com alerta de *estoque baixo*. |
 | **Vendas** | Monta a venda (cliente + itens) e registra; o estoque é baixado automaticamente. |
-| **Relatórios** | Painel que abre já carregado: indicadores, **gráfico** de vendas anuais, vendas por período, **produtos mais vendidos** e itens para repor. |
+| **Relatórios** | Relatórios detalhados que abrem já carregados: indicadores, **gráfico** de vendas anuais, vendas por período, **produtos mais vendidos** e itens para repor. |
+| **Equipe** | Tela de administradores para criar usuários, definir perfil (**ADMIN** ou **FUNCIONARIO**), trocar senha e ativar/desativar membros. Funcionários veem apenas **Clientes** e **Vendas** no menu. |
 
 ### 🔑 Recuperação de senha por e-mail
 1. Na tela de login, clique em **"Esqueci minha senha"** e informe o e-mail.
@@ -101,11 +105,11 @@ infocontrol/
 │   ├── auth.py           #     Login JWT, perfis e recuperação de senha
 │   ├── exceptions.py     #     Exceções de negócio + handler global de erros
 │   ├── urls.py           #     Rotas da API
-│   └── tests.py          #     18 testes automatizados
+│   └── tests.py          #     25 testes automatizados
 │
 └── web/                  # 🎨 Interface web (consome a API via JavaScript)
     ├── views.py          #     Entrega as páginas HTML
-    └── templates/web/    #     Telas: login, clientes, produtos, vendas, relatórios
+    └── templates/web/    #     Telas: login, dashboard, clientes, produtos, vendas, relatórios, equipe
 ```
 
 ---
@@ -122,11 +126,13 @@ Todas as rotas (exceto login e recuperação de senha) exigem o cabeçalho:
 | GET | `/api/auth/me/` | Dados do usuário logado |
 | POST | `/api/auth/recuperar-senha/` | Envia e-mail de recuperação |
 | POST | `/api/auth/redefinir-senha/` | Redefine a senha (uid + token) |
+| GET / POST | `/api/equipe/` | Lista / cria usuários da equipe (**ADMIN**) |
+| GET / PUT / PATCH | `/api/equipe/{id}/` | Detalha / edita perfil, senha e status de usuário (**ADMIN**) |
 | GET / POST | `/api/clientes/` | Lista / cadastra clientes |
 | GET / PUT / DELETE | `/api/clientes/{id}/` | Detalha / edita / remove cliente |
-| GET / POST | `/api/produtos/` | Lista / cadastra produtos |
-| GET / PUT / DELETE | `/api/produtos/{id}/` | Detalha / edita / remove produto |
-| GET | `/api/produtos/estoque-baixo/` | Produtos no/abaixo do estoque mínimo |
+| GET / POST | `/api/produtos/` | Lista produtos para usuários logados / cadastra produtos para **ADMIN** |
+| GET / PUT / DELETE | `/api/produtos/{id}/` | Detalha produtos para usuários logados / edita ou remove para **ADMIN** |
+| GET | `/api/produtos/estoque-baixo/` | Produtos no/abaixo do estoque mínimo (**ADMIN**) |
 | GET / POST | `/api/vendas/` | Lista / registra vendas |
 | GET | `/api/vendas/{id}/` | Detalha uma venda |
 | GET | `/api/relatorios/vendas/?inicio=&fim=` | Vendas por período |
@@ -154,7 +160,7 @@ POST /api/vendas/
 ```bash
 python manage.py test
 ```
-> 18 testes cobrindo autenticação, CRUD, catálogo, regras de venda, relatórios e recuperação de senha.
+> 25 testes cobrindo autenticação, feedback de login, equipe/perfis, CRUD, catálogo, regras de venda, relatórios, permissões de funcionário e recuperação de senha.
 
 ---
 
@@ -187,7 +193,7 @@ O projeto separa responsabilidades em camadas, o que facilita a manutenção:
 ### Segurança
 - Autenticação por token **JWT** com expiração.
 - Senhas armazenadas com **hash** (PBKDF2, padrão do Django).
-- **Controle de acesso por perfil**: apenas **ADMIN** pode excluir registros.
+- **Controle de acesso por perfil**: **ADMIN** acessa todo o sistema; **FUNCIONARIO** acessa clientes e vendas, com leitura de produtos apenas para registrar vendas.
 - Todas as rotas da API são protegidas por padrão.
 
 ### Regras de negócio

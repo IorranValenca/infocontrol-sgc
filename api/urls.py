@@ -17,6 +17,8 @@ urlpatterns = [
     path("auth/me/", auth.usuario_logado),
     path("auth/recuperar-senha/", auth.recuperar_senha),
     path("auth/redefinir-senha/", auth.redefinir_senha),
+    path("equipe/", auth.equipe),
+    path("equipe/<int:usuario_id>/", auth.equipe_detalhe),
 
     # Relatorios
     path("relatorios/vendas/", views.relatorio_periodo),

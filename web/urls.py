@@ -5,8 +5,11 @@ from . import views
 urlpatterns = [
     path("", views.login),                  # Tela de login (pagina inicial)
     path("recuperar/", views.recuperar),     # Recuperacao de senha
+    path("dashboard/", views.dashboard),     # Painel principal do sistema
     path("clientes/", views.clientes),       # Cadastro de clientes
     path("produtos/", views.produtos),       # Cadastro de produtos
     path("vendas/", views.vendas),           # Registro de vendas
     path("relatorios/", views.relatorios),   # Relatorios de vendas
+    path("equipe/", views.equipe),           # Gerenciamento da equipe
+    path("team/", views.equipe),             # Alias em ingles para a tela de equipe
 ]

@@ -16,7 +16,9 @@ def pagina(template):
 # Uma view por tela do sistema.
 login = pagina("login")
 recuperar = pagina("recuperar")
+dashboard = pagina("dashboard")
 clientes = pagina("clientes")
 produtos = pagina("produtos")
 vendas = pagina("vendas")
 relatorios = pagina("relatorios")
+equipe = pagina("equipe")

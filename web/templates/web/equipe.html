@@ -1,0 +1,147 @@
+{% extends "web/base.html" %}
+{# Tela de equipe: admins criam usuarios e definem o perfil de acesso. #}
+
+{% block content %}
+<h1>Equipe</h1>
+
+<style>
+  .team-head { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; margin-bottom: 16px; }
+  .team-head p { color: var(--muted); font-size: 14px; }
+  .role-help { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; background: var(--ok); }
+  .status-dot.off { background: var(--danger); }
+  .actions { white-space: nowrap; display: flex; gap: 8px; justify-content: flex-end; }
+  @media (max-width: 720px) { .actions { white-space: normal; flex-wrap: wrap; } }
+</style>
+
+<div class="card">
+  <div class="team-head">
+    <h2 id="form-titulo">Novo usuario</h2>
+    <p>Funcionarios acessam somente Clientes e Vendas.</p>
+  </div>
+  <form id="form">
+    <input type="hidden" id="id">
+    <div class="row">
+      <div><label>Usuario</label><input id="username" required></div>
+      <div><label>E-mail</label><input id="email" type="email"></div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Perfil</label>
+        <select id="perfil">
+          <option value="FUNCIONARIO">Funcionario</option>
+          <option value="ADMIN">Administrador</option>
+        </select>
+      </div>
+      <div>
+        <label>Status</label>
+        <select id="ativo">
+          <option value="true">Ativo</option>
+          <option value="false">Inativo</option>
+        </select>
+      </div>
+      <div><label>Senha</label><input id="senha" type="password" required></div>
+    </div>
+    <div class="role-help">Administrador acessa todo o sistema. Funcionario pode cadastrar clientes e registrar vendas.</div>
+    <div style="margin-top:16px; display:flex; gap:10px">
+      <button type="submit">Salvar</button>
+      <button type="button" class="ghost" onclick="limpar()">Limpar</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Usuarios cadastrados</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Usuario</th><th>E-mail</th><th>Perfil</th><th>Status</th><th></th></tr></thead>
+    <tbody id="lista"></tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  let usuarios = [];
+  let usuarioLogado = null;
+
+  const rotuloPerfil = (p) => p === "ADMIN" ? "Administrador" : "Funcionario";
+
+  async function carregar() {
+    usuarios = await api("/equipe/");
+    lista.innerHTML = usuarios.map(u => `
+      <tr>
+        <td>${u.id}</td>
+        <td>${u.username}${u.superusuario ? ' <span class="badge">Superusuario</span>' : ""}</td>
+        <td>${u.email || "-"}</td>
+        <td>${rotuloPerfil(u.perfil)}</td>
+        <td><span class="status-dot ${u.ativo ? "" : "off"}"></span>${u.ativo ? "Ativo" : "Inativo"}</td>
+        <td>
+          <div class="actions">
+            <button class="ghost sm" onclick="editar(${u.id})">Editar</button>
+            ${u.id === usuarioLogado.id ? "" : `<button class="${u.ativo ? "danger" : "ghost"} sm" onclick="alternar(${u.id})">${u.ativo ? "Desativar" : "Ativar"}</button>`}
+          </div>
+        </td>
+      </tr>`).join("") || `<tr><td colspan="6" style="color:var(--muted)">Nenhum usuario cadastrado.</td></tr>`;
+  }
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    if (!id.value && !senha.value) return toast("Informe a senha.", false);
+
+    const corpo = {
+      username: username.value,
+      email: email.value,
+      perfil: perfil.value,
+      ativo: ativo.value === "true",
+    };
+    if (senha.value) corpo.password = senha.value;
+
+    try {
+      if (id.value) await api(`/equipe/${id.value}/`, { method: "PATCH", body: JSON.stringify(corpo) });
+      else await api("/equipe/", { method: "POST", body: JSON.stringify(corpo) });
+      toast("Usuario salvo com sucesso.");
+      limpar();
+      carregar();
+    } catch (err) { toast(err.message, false); }
+  };
+
+  function editar(uid) {
+    const u = usuarios.find(x => x.id === uid);
+    id.value = u.id;
+    username.value = u.username;
+    email.value = u.email || "";
+    perfil.value = u.perfil;
+    ativo.value = String(u.ativo);
+    senha.value = "";
+    senha.required = false;
+    senha.placeholder = "Deixe vazio para manter";
+    document.getElementById("form-titulo").textContent = "Editar usuario";
+  }
+
+  async function alternar(uid) {
+    const u = usuarios.find(x => x.id === uid);
+    const acao = u.ativo ? "desativar" : "ativar";
+    if (!confirm(`Deseja ${acao} este usuario?`)) return;
+    try {
+      await api(`/equipe/${uid}/`, { method: "PATCH", body: JSON.stringify({ ativo: !u.ativo }) });
+      toast(u.ativo ? "Usuario desativado." : "Usuario ativado.");
+      carregar();
+    } catch (err) { toast(err.message, false); }
+  }
+
+  function limpar() {
+    form.reset();
+    id.value = "";
+    senha.required = true;
+    senha.placeholder = "";
+    ativo.value = "true";
+    perfil.value = "FUNCIONARIO";
+    document.getElementById("form-titulo").textContent = "Novo usuario";
+  }
+
+  requireAdmin().then((u) => {
+    usuarioLogado = u;
+    carregar();
+  }).catch(() => {});
+</script>
+{% endblock %}

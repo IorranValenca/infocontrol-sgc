@@ -43,6 +43,10 @@ class ProdutoViewSet(AdminDeleteMixin, viewsets.ModelViewSet):
     queryset = Produto.objects.all().order_by("id")
     serializer_class = ProdutoSerializer
 
+    def get_permissions(self):
+        """Funcionarios podem ler produtos para vender; alteracoes ficam com ADMIN."""
+        return [IsAuthenticated()] if self.action in ("list", "retrieve") else [IsAdminPerfil()]
+
     def destroy(self, request, *args, **kwargs):
         """Bloqueia a exclusao de produto ja vinculado a alguma venda."""
         if self.get_object().itens_venda.exists():      # Produto aparece em algum item de venda?
@@ -79,7 +83,7 @@ class VendaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAdminPerfil])
 def relatorio_periodo(request):
     """GET /api/relatorios/vendas/?inicio=&fim= -> vendas e total de um periodo."""
     vendas, total = RelatorioService.vendas_por_periodo(    # Busca as vendas entre as datas
@@ -92,7 +96,7 @@ def relatorio_periodo(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAdminPerfil])
 def relatorio_cliente(request, cliente_id):
     """GET /api/relatorios/vendas-cliente/{id}/ -> historico de compras de um cliente."""
     cliente, vendas, total = RelatorioService.vendas_por_cliente(cliente_id)
@@ -105,7 +109,7 @@ def relatorio_cliente(request, cliente_id):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAdminPerfil])
 def relatorio_anual(request):
     """GET /api/relatorios/vendas-anuais/?ano= -> total vendido mes a mes (grafico)."""
     ano = int(request.query_params.get("ano", 2026))        # Ano pedido (padrao 2026)
@@ -113,7 +117,7 @@ def relatorio_anual(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAdminPerfil])
 def relatorio_mais_vendidos(request):
     """GET /api/relatorios/mais-vendidos/ -> produtos campeoes de venda (best-sellers)."""
     return Response({"produtos": RelatorioService.produtos_mais_vendidos()})

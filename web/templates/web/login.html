@@ -8,11 +8,12 @@
     <img class="brand-logo" src="{% static 'web/logo.png' %}" alt="InfoControl">
     <div class="sub">Sistema de Gestao Comercial</div>
 
-    <form id="form">
+    <form id="form" novalidate>
       <label>Usuario</label>
       <input id="username" required autofocus>
       <label>Senha</label>
       <input id="senha" type="password" required>
+      <div id="login-erro" role="alert" aria-live="polite" style="display:none; margin-top:12px; color:var(--danger); font-size:13px; font-weight:600;"></div>
       <button type="submit">Entrar</button>
     </form>
 
@@ -24,23 +25,44 @@
 {% block script %}
 <script>
   // Ja autenticado? Vai direto para o sistema.
-  if (getToken()) location.href = "/clientes/";
+  if (getToken()) getMe().then((u) => location.href = homeFor(u.perfil)).catch(() => location.href = "/");
+
+  function mostrarErroLogin(msg) {
+    const erro = document.getElementById("login-erro");
+    erro.textContent = msg;
+    erro.style.display = "block";
+  }
+
+  function limparErroLogin() {
+    const erro = document.getElementById("login-erro");
+    erro.style.display = "none";
+    erro.textContent = "";
+  }
 
   // Envia usuario e senha para /api/auth/login/ e guarda o token retornado.
   document.getElementById("form").onsubmit = async (e) => {
     e.preventDefault();
+    limparErroLogin();
+
+    const usuario = username.value.trim();
+    const password = senha.value;
+    if (!usuario && !password) return mostrarErroLogin("Informe o usuario e a senha.");
+    if (!usuario) return mostrarErroLogin("Informe o usuario.");
+    if (!password) return mostrarErroLogin("Informe a senha.");
+
     try {
       const data = await api("/auth/login/", {
         method: "POST",
         body: JSON.stringify({
-          username: username.value,
-          password: senha.value,
+          username: usuario,
+          password: password,
         }),
       });
       setToken(data.access);          // Guarda o token JWT no navegador
-      location.href = "/clientes/";   // Entra no sistema
+      location.href = homeFor(data.perfil);  // Entra na tela inicial do perfil
     } catch (err) {
-      toast("Usuario ou senha invalidos.", false);
+      mostrarErroLogin("Usuario nao encontrado ou senha invalida.");
+      toast("Usuario nao encontrado ou senha invalida.", false);
     }
   };
 </script>

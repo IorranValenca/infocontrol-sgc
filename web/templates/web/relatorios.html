@@ -73,7 +73,6 @@
 <!-- Biblioteca de graficos (CDN) para a representacao grafica das vendas anuais -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
-  requireAuth();
   const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
   let chart;
 
@@ -121,7 +120,7 @@
   }
 
   // Preenche os filtros com o ano atual e ja carrega tudo ao abrir a pagina.
-  (function iniciar() {
+  function iniciar() {
     const hoje = new Date();
     ano.value = hoje.getFullYear();
     inicio.value = `${hoje.getFullYear()}-01-01`;   // Comeco do ano atual
@@ -133,6 +132,8 @@
     // Recarrega automaticamente quando qualquer filtro muda (sem botao).
     inicio.onchange = fim.onchange = carregarPeriodo;
     ano.onchange = carregarAnual;
-  })();
+  }
+
+  requireAdmin().then(iniciar).catch(() => {});
 </script>
 {% endblock %}

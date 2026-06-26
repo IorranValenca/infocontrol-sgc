@@ -15,6 +15,8 @@ from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.response import Response                        # Resposta JSON
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer  # Serializer padrao do login JWT
 from rest_framework_simplejwt.views import TokenObtainPairView      # View padrao do login JWT
+from .exceptions import RegraNegocioException
+from .models import PerfilUsuario
 
 
 def perfil_do(usuario):
@@ -24,6 +26,42 @@ def perfil_do(usuario):
         return "ADMIN"
     # Caso contrario, le o perfil cadastrado; se nao houver, assume FUNCIONARIO.
     return getattr(getattr(usuario, "perfil_usuario", None), "perfil", "FUNCIONARIO")
+
+
+def dados_usuario(usuario):
+    """Serializa os dados de um usuario para a tela de equipe."""
+    return {
+        "id": usuario.id,
+        "username": usuario.username,
+        "email": usuario.email,
+        "perfil": perfil_do(usuario),
+        "ativo": usuario.is_active,
+        "superusuario": usuario.is_superuser,
+    }
+
+
+def validar_perfil(perfil):
+    """Normaliza e valida o perfil recebido pela API."""
+    perfil = (perfil or "FUNCIONARIO").upper()
+    if perfil not in dict(PerfilUsuario.PERFIS):
+        raise RegraNegocioException("Perfil invalido.")
+    return perfil
+
+
+def salvar_perfil(usuario, perfil):
+    """Grava o perfil funcional usado pelo controle de acesso da API."""
+    if usuario.is_superuser:
+        return
+    PerfilUsuario.objects.update_or_create(usuario=usuario, defaults={"perfil": perfil})
+
+
+def valor_booleano(valor, padrao=True):
+    """Converte booleanos vindos como JSON ou texto."""
+    if valor is None:
+        return padrao
+    if isinstance(valor, str):
+        return valor.lower() not in ("false", "0", "nao")
+    return bool(valor)
 
 
 class IsAdminPerfil(BasePermission):
@@ -54,7 +92,77 @@ class LoginView(TokenObtainPairView):
 @permission_classes([IsAuthenticated])          # Exige usuario autenticado
 def usuario_logado(request):
     """GET /api/auth/me/ -> dados do usuario autenticado (usado pela interface web)."""
-    return Response({"username": request.user.username, "perfil": perfil_do(request.user)})
+    return Response(dados_usuario(request.user))
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAdminPerfil])
+def equipe(request):
+    """GET/POST /api/equipe/ -> lista e cria usuarios da equipe (somente ADMIN)."""
+    if request.method == "GET":
+        usuarios = User.objects.all().order_by("id")
+        return Response([dados_usuario(usuario) for usuario in usuarios])
+
+    username = (request.data.get("username") or "").strip()
+    email = (request.data.get("email") or "").strip()
+    senha = request.data.get("password") or request.data.get("senha")
+    perfil = validar_perfil(request.data.get("perfil"))
+
+    if not username:
+        raise RegraNegocioException("Informe o usuario.")
+    if not senha:
+        raise RegraNegocioException("Informe a senha.")
+    if User.objects.filter(username=username).exists():
+        raise RegraNegocioException("Usuario ja existe.")
+
+    usuario = User.objects.create_user(username=username, email=email, password=senha)
+    usuario.is_active = valor_booleano(request.data.get("ativo"), True)
+    usuario.save()
+    salvar_perfil(usuario, perfil)
+    return Response(dados_usuario(usuario), status=status.HTTP_201_CREATED)
+
+
+@api_view(["GET", "PUT", "PATCH"])
+@permission_classes([IsAdminPerfil])
+def equipe_detalhe(request, usuario_id):
+    """GET/PUT/PATCH /api/equipe/{id}/ -> consulta ou atualiza usuario da equipe."""
+    usuario = User.objects.filter(id=usuario_id).first()
+    if not usuario:
+        raise RegraNegocioException("Usuario nao encontrado.")
+
+    if request.method == "GET":
+        return Response(dados_usuario(usuario))
+
+    username = request.data.get("username")
+    if username is not None:
+        username = username.strip()
+        if not username:
+            raise RegraNegocioException("Informe o usuario.")
+        if User.objects.exclude(id=usuario.id).filter(username=username).exists():
+            raise RegraNegocioException("Usuario ja existe.")
+        usuario.username = username
+
+    if "email" in request.data:
+        usuario.email = (request.data.get("email") or "").strip()
+
+    senha = request.data.get("password") or request.data.get("senha")
+    if senha:
+        usuario.set_password(senha)
+
+    if "ativo" in request.data:
+        ativo = valor_booleano(request.data.get("ativo"), True)
+        if usuario.id == request.user.id and not ativo:
+            raise RegraNegocioException("Voce nao pode desativar seu proprio usuario.")
+        usuario.is_active = ativo
+
+    if "perfil" in request.data:
+        perfil = validar_perfil(request.data.get("perfil"))
+        if usuario.id == request.user.id and perfil != "ADMIN":
+            raise RegraNegocioException("Voce nao pode remover seu proprio perfil ADMIN.")
+        salvar_perfil(usuario, perfil)
+
+    usuario.save()
+    return Response(dados_usuario(usuario))
 
 
 @api_view(["POST"])                             # Endpoint que responde a requisicoes POST

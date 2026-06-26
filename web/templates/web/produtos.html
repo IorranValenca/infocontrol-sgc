@@ -56,8 +56,6 @@
 
 {% block script %}
 <script>
-  requireAuth();
-
   // Categorias do catalogo (valor enviado a API + rotulo exibido). Espelha o modelo Produto.
   const CATS = [["NOTEBOOK", "Notebooks"], ["COMPUTADOR", "Computadores"], ["PERIFERICO", "Perifericos"],
     ["COMPONENTE", "Componentes"], ["MONITOR", "Monitores"], ["ARMAZENAMENTO", "Armazenamento"],
@@ -150,9 +148,13 @@
     document.getElementById("form-titulo").textContent = "Novo produto";
   }
 
-  montarSelects();
-  busca.oninput = render;                                    // Busca em tempo real
-  document.getElementById("filtro-cat").onchange = render;   // Filtro por categoria
-  carregar();
+  function iniciar() {
+    montarSelects();
+    busca.oninput = render;                                    // Busca em tempo real
+    document.getElementById("filtro-cat").onchange = render;   // Filtro por categoria
+    carregar();
+  }
+
+  requireAdmin().then(iniciar).catch(() => {});
 </script>
 {% endblock %}

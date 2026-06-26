@@ -36,7 +36,7 @@
     /* Barra de navegacao: fixa no topo e levemente translucida */
     nav {
       position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--border);
-      background: rgba(255,255,255,.82); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+      background: #fff;
     }
     nav .inner { max-width: 960px; margin: 0 auto; display: flex; align-items: center; gap: 22px; padding: 0 24px; height: 62px; }
     nav .logo { height: 30px; display: block; }                          /* logo (imagem) na barra de navegacao */
@@ -125,11 +125,13 @@
   {% block nav %}
   <nav>
     <div class="inner">
-      <a href="/clientes/"><img class="logo" src="{% static 'web/logo.png' %}" alt="InfoControl"></a>
+      <a id="nav-home" href="/dashboard/"><img class="logo" src="{% static 'web/logo.png' %}" alt="InfoControl"></a>
+      <a class="link" data-admin-only href="/dashboard/">Dashboard</a>
       <a class="link" href="/clientes/">Clientes</a>
-      <a class="link" href="/produtos/">Produtos</a>
+      <a class="link" data-admin-only href="/produtos/">Produtos</a>
       <a class="link" href="/vendas/">Vendas</a>
-      <a class="link" href="/relatorios/">Relatorios</a>
+      <a class="link" data-admin-only href="/relatorios/">Relatorios</a>
+      <a class="link" data-admin-only href="/equipe/">Equipe</a>
       <div class="right">
         <span id="userinfo"></span>
         <button class="ghost sm" onclick="logout()">Sair</button>
@@ -158,6 +160,7 @@
     const getToken = () => localStorage.getItem(KEY);          // Le o token salvo
     const setToken = (t) => localStorage.setItem(KEY, t);      // Salva o token apos o login
     const clearToken = () => localStorage.removeItem(KEY);     // Remove o token (logout)
+    let usuarioAtualPromise = null;                            // Cache da consulta /auth/me/
     // Formata valores no padrao monetario brasileiro (ex.: R$ 18.000,00, com separador de milhar).
     const money = (v) => Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -166,14 +169,47 @@
       options.headers = Object.assign({ "Content-Type": "application/json" }, options.headers);
       if (getToken()) options.headers["Authorization"] = "Bearer " + getToken();
       const resp = await fetch(API + path, options);
-      if (resp.status === 401) { clearToken(); location.href = "/"; return; }  // Sessao expirada
+      const authPublica = path.startsWith("/auth/login/") || path.startsWith("/auth/recuperar-senha/") || path.startsWith("/auth/redefinir-senha/");
+      if (resp.status === 401 && !authPublica) { clearToken(); location.href = "/"; return; }  // Sessao expirada
       const data = resp.status === 204 ? {} : await resp.json();
-      if (!resp.ok) throw new Error(data.erro || "Erro na requisicao.");
+      if (!resp.ok) throw new Error(data.erro?.detail || data.erro || "Erro na requisicao.");
       return data;
     }
 
     // Redireciona para o login quando nao ha usuario autenticado.
     function requireAuth() { if (!getToken()) location.href = "/"; }
+
+    // Define a tela inicial conforme o perfil.
+    function homeFor(perfil) { return perfil === "ADMIN" ? "/dashboard/" : "/clientes/"; }
+
+    // Le os dados do usuario logado uma unica vez e reaproveita entre menu e paginas.
+    async function getMe() {
+      if (!getToken()) return null;
+      if (!usuarioAtualPromise) usuarioAtualPromise = api("/auth/me/");
+      return usuarioAtualPromise;
+    }
+
+    // Redireciona quando uma tela e exclusiva de administradores.
+    async function requireAdmin() {
+      requireAuth();
+      const usuario = await getMe();
+      if (!usuario) throw new Error("Usuario nao autenticado.");
+      if (usuario.perfil !== "ADMIN") {
+        toast("Acesso restrito ao administrador.", false);
+        location.href = homeFor(usuario.perfil);
+        throw new Error("Acesso restrito.");
+      }
+      return usuario;
+    }
+
+    // Esconde links administrativos para funcionarios.
+    function aplicarMenuPorPerfil(usuario) {
+      const home = document.getElementById("nav-home");
+      if (home) home.href = homeFor(usuario.perfil);
+      if (usuario.perfil !== "ADMIN") {
+        document.querySelectorAll("[data-admin-only]").forEach((item) => item.remove());
+      }
+    }
 
     // Encerra a sessao do usuario (e descarta o carrinho em andamento).
     function logout() { clearToken(); localStorage.removeItem(KEY_CART); location.href = "/"; }
@@ -206,7 +242,11 @@
     (async () => {
       const box = document.getElementById("userinfo");
       if (box && getToken()) {
-        try { const u = await api("/auth/me/"); box.textContent = u.username + " · " + u.perfil; } catch (e) {}
+        try {
+          const u = await getMe();
+          box.textContent = u.username + " - " + u.perfil;
+          aplicarMenuPorPerfil(u);
+        } catch (e) {}
       }
     })();
   </script>

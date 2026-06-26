@@ -1,11 +1,11 @@
 """Testes automatizados da API (autenticacao, CRUD, vendas, relatorios, recuperacao de senha)."""
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework.test import APIClient
-from .models import Cliente, Produto, Venda
+from .models import Cliente, PerfilUsuario, Produto, Venda
 
 
 class InfoControlTests(TestCase):
@@ -19,6 +19,15 @@ class InfoControlTests(TestCase):
         self.api.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
         self.cliente = Cliente.objects.create(nome="Joao", cpf="12345678901", email="joao@email.com")
         self.produto = Produto.objects.create(nome="Mouse", preco=100, quantidade_estoque=10, estoque_minimo=2)
+
+    def cliente_funcionario(self):
+        """Cria e autentica um funcionario para testar permissoes de caixa/venda."""
+        usuario = User.objects.create_user("caixa", "caixa@loja.com", "123456")
+        PerfilUsuario.objects.create(usuario=usuario, perfil="FUNCIONARIO")
+        api = APIClient()
+        token = api.post("/api/auth/login/", {"username": "caixa", "password": "123456"}, format="json").data["access"]
+        api.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+        return api
 
     # --- Autenticacao ---
     def test_login_retorna_token_e_perfil(self):
@@ -36,6 +45,40 @@ class InfoControlTests(TestCase):
         """O endpoint /auth/me/ devolve o usuario autenticado."""
         r = self.api.get("/api/auth/me/")
         self.assertEqual(r.data["username"], "admin")
+
+    def test_tela_login_tem_feedback_de_erro(self):
+        """A tela de login possui feedback visivel para credenciais invalidas."""
+        conteudo = Client().get("/").content
+        self.assertIn(b"login-erro", conteudo)
+        self.assertIn(b"novalidate", conteudo)
+        self.assertIn(b"Informe o usuario", conteudo)
+        self.assertIn(b"Usuario nao encontrado ou senha invalida", conteudo)
+        self.assertIn(b"authPublica", conteudo)
+
+    def test_admin_cria_funcionario_na_equipe(self):
+        """Um ADMIN pode criar usuario funcionario com senha e perfil."""
+        r = self.api.post("/api/equipe/", {
+            "username": "vendedor", "email": "vendedor@loja.com",
+            "password": "123456", "perfil": "FUNCIONARIO",
+        }, format="json")
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.data["perfil"], "FUNCIONARIO")
+        self.assertTrue(User.objects.get(username="vendedor").check_password("123456"))
+
+    def test_admin_atualiza_usuario_da_equipe(self):
+        """Um ADMIN pode trocar perfil e status de usuario da equipe."""
+        usuario = User.objects.create_user("assistente", "a@loja.com", "123456")
+        PerfilUsuario.objects.create(usuario=usuario, perfil="FUNCIONARIO")
+        r = self.api.patch(f"/api/equipe/{usuario.id}/", {"perfil": "ADMIN", "ativo": False}, format="json")
+        self.assertEqual(r.status_code, 200)
+        usuario.refresh_from_db()
+        self.assertFalse(usuario.is_active)
+        usuario.perfil_usuario.refresh_from_db()
+        self.assertEqual(usuario.perfil_usuario.perfil, "ADMIN")
+
+    def test_funcionario_nao_gerencia_equipe(self):
+        """Funcionario nao pode acessar a gestao de equipe."""
+        self.assertEqual(self.cliente_funcionario().get("/api/equipe/").status_code, 403)
 
     # --- Clientes ---
     def test_criar_cliente(self):
@@ -81,6 +124,13 @@ class InfoControlTests(TestCase):
         self.assertEqual(r.data["marca"], "LG")
         self.assertEqual(r.data["garantia_meses"], 24)
 
+    def test_funcionario_le_produtos_mas_nao_altera_catalogo(self):
+        """Funcionario pode ler produtos para vender, mas nao cadastrar/editar catalogo."""
+        api = self.cliente_funcionario()
+        self.assertEqual(api.get("/api/produtos/").status_code, 200)
+        r = api.post("/api/produtos/", {"nome": "SSD", "preco": "300.00", "quantidade_estoque": 2}, format="json")
+        self.assertEqual(r.status_code, 403)
+
     # --- Vendas ---
     def test_registrar_venda_baixa_estoque_e_calcula_total(self):
         """Ao vender, o estoque diminui e o valor_total e calculado automaticamente."""
@@ -102,6 +152,14 @@ class InfoControlTests(TestCase):
         r = self.api.post("/api/vendas/", {"cliente_id": self.cliente.id, "itens": []}, format="json")
         self.assertEqual(r.status_code, 400)
 
+    def test_funcionario_acessa_clientes_e_registra_venda(self):
+        """Funcionario consegue usar as areas permitidas: clientes e vendas."""
+        api = self.cliente_funcionario()
+        self.assertEqual(api.get("/api/clientes/").status_code, 200)
+        r = api.post("/api/vendas/", {"cliente_id": self.cliente.id,
+            "itens": [{"produto_id": self.produto.id, "quantidade": 1}]}, format="json")
+        self.assertEqual(r.status_code, 201)
+
     # --- Relatorios ---
     def test_relatorio_periodo(self):
         """O relatorio por periodo devolve o total vendido."""
@@ -120,6 +178,10 @@ class InfoControlTests(TestCase):
         r = self.api.get("/api/relatorios/mais-vendidos/")
         self.assertEqual(r.status_code, 200)
         self.assertIn(self.produto.nome, [p["produto"] for p in r.data["produtos"]])
+
+    def test_funcionario_nao_acessa_relatorios(self):
+        """Relatorios ficam restritos ao ADMIN."""
+        self.assertEqual(self.cliente_funcionario().get("/api/relatorios/vendas/").status_code, 403)
 
     # --- Recuperacao de senha ---
     def test_recuperar_senha_responde_generico(self):

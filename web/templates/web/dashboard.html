@@ -1,0 +1,307 @@
+{% extends "web/base.html" %}
+{# Painel principal: consolida clientes, produtos, estoque, vendas e relatorios. #}
+
+{% block content %}
+<style>
+  .dash-title { margin-bottom: 6px; }
+  .dash-hero { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; margin-bottom: 18px; }
+  .dash-hero p { color: var(--muted); max-width: 620px; }
+  .quick-actions { position: relative; width: 236px; height: 158px; flex: 0 0 236px; }
+  .add-action {
+    position: absolute; left: 50%; top: 50%; z-index: 2; display: flex; align-items: center; justify-content: center;
+    width: 58px; height: 58px; padding: 0; border-radius: 50%; border-color: var(--border);
+    background: #fff; color: var(--primary-dark); box-shadow: 0 6px 16px rgba(45,40,30,.10);
+    transform: translate(-50%, -50%) rotate(0deg); transition: transform .24s cubic-bezier(.2,.8,.2,1), background .15s;
+  }
+  .add-action:hover { background: var(--hover); }
+  .add-symbol { display: block; font-size: 32px; font-weight: 500; line-height: 1; transform: translateY(-1px); }
+  .quick-actions.open .add-action { transform: translate(-50%, -50%) rotate(45deg); }
+  .orbit-action {
+    position: absolute; left: 50%; top: 50%; min-width: 108px; text-align: center; border: 1px solid var(--border);
+    border-radius: 999px; padding: 9px 13px; background: #fff; color: var(--text); font-size: 14px; font-weight: 600;
+    box-shadow: 0 8px 22px rgba(45,40,30,.08); opacity: 0; pointer-events: none;
+    transform: translate(-50%, -50%) translate(0, 0) scale(.72);
+    transition: opacity .18s ease, transform .24s cubic-bezier(.2,.8,.2,1), background .15s;
+  }
+  .orbit-action:hover { background: var(--hover); }
+  .quick-actions.open .orbit-action {
+    opacity: 1; pointer-events: auto;
+    transform: translate(-50%, -50%) translate(var(--orbit-x), var(--orbit-y)) scale(1);
+  }
+
+  .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+  .metric { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 18px; box-shadow: 0 1px 2px rgba(45,40,30,.04), 0 4px 16px rgba(45,40,30,.03); }
+  .metric-label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .metric-value { display: block; font-family: "Newsreader", Georgia, serif; font-size: 30px; line-height: 1.1; margin-top: 7px; }
+  .metric-note { display: block; color: var(--muted); font-size: 13px; margin-top: 7px; }
+
+  .dash-grid { display: grid; grid-template-columns: 1.4fr .9fr; gap: 20px; align-items: start; }
+  .stack { display: grid; gap: 20px; }
+  .section-head { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; margin-bottom: 14px; }
+  .section-head h2 { margin: 0; }
+  .section-head a, .section-head span { color: var(--muted); font-size: 13px; }
+  .mini-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .mini-stat { border: 1px solid var(--border); border-radius: 12px; padding: 13px 14px; background: #fff; }
+  .mini-stat span { display: block; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .mini-stat strong { display: block; font-size: 20px; margin-top: 4px; }
+  .bar-list { display: grid; gap: 12px; }
+  .bar-row { display: grid; grid-template-columns: 120px 1fr 42px; gap: 10px; align-items: center; font-size: 14px; }
+  .bar-track { height: 9px; border-radius: 99px; background: var(--hover); overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--primary); border-radius: inherit; }
+  .muted-row td { color: var(--muted); }
+  @media (max-width: 880px) {
+    .metric-grid, .dash-grid { grid-template-columns: 1fr; }
+    .dash-hero { align-items: flex-start; flex-direction: column; }
+    .quick-actions { align-self: flex-end; }
+  }
+  @media (max-width: 560px) {
+    .metric-grid, .mini-grid { grid-template-columns: 1fr; }
+    .bar-row { grid-template-columns: 1fr; gap: 5px; }
+    .quick-actions { align-self: center; width: 210px; height: 150px; }
+    .orbit-action { min-width: 96px; font-size: 13px; }
+  }
+</style>
+
+<div class="dash-hero">
+  <div>
+    <h1 class="dash-title">Dashboard</h1>
+    <p>Visao geral do sistema com clientes, catalogo, estoque, vendas e relatorios reunidos em uma so tela.</p>
+  </div>
+  <div class="quick-actions" id="quick-actions">
+    <button class="add-action" type="button" id="add-action" aria-label="Adicionar" aria-expanded="false" onclick="toggleQuickActions(event)"><span class="add-symbol">+</span></button>
+    <a class="orbit-action" href="/clientes/" style="--orbit-x:-78px; --orbit-y:-58px">Cliente</a>
+    <a class="orbit-action" href="/produtos/" style="--orbit-x:-104px; --orbit-y:12px">Produto</a>
+    <a class="orbit-action" href="/vendas/" style="--orbit-x:-36px; --orbit-y:68px">Venda</a>
+  </div>
+</div>
+
+<div class="metric-grid">
+  <div class="metric">
+    <span class="metric-label">Clientes</span>
+    <span class="metric-value" id="m-clientes">-</span>
+    <span class="metric-note" id="n-clientes">cadastrados</span>
+  </div>
+  <div class="metric">
+    <span class="metric-label">Produtos</span>
+    <span class="metric-value" id="m-produtos">-</span>
+    <span class="metric-note" id="n-produtos">no catalogo</span>
+  </div>
+  <div class="metric">
+    <span class="metric-label">Vendas</span>
+    <span class="metric-value" id="m-vendas">-</span>
+    <span class="metric-note" id="n-vendas">registradas</span>
+  </div>
+  <div class="metric">
+    <span class="metric-label">Receita total</span>
+    <span class="metric-value" id="m-receita">-</span>
+    <span class="metric-note" id="n-ticket">ticket medio</span>
+  </div>
+</div>
+
+<div class="dash-grid">
+  <div class="stack">
+    <div class="card">
+      <div class="section-head">
+        <h2>Vendas no ano</h2>
+        <span id="ano-label"></span>
+      </div>
+      <canvas id="grafico-dashboard" height="120"></canvas>
+    </div>
+
+    <div class="card">
+      <div class="section-head">
+        <h2>Vendas recentes</h2>
+        <a href="/vendas/">Ver vendas</a>
+      </div>
+      <table>
+        <thead><tr><th>ID</th><th>Data</th><th>Cliente</th><th>Itens</th><th>Total</th></tr></thead>
+        <tbody id="vendas-recentes"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="section-head">
+        <h2>Produtos mais vendidos</h2>
+        <a href="/relatorios/">Ver relatorios</a>
+      </div>
+      <table>
+        <thead><tr><th>Produto</th><th>Marca</th><th>Qtd vendida</th><th>Receita</th></tr></thead>
+        <tbody id="mais-vendidos"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="section-head">
+        <h2>Estoque</h2>
+        <a href="/produtos/">Gerenciar</a>
+      </div>
+      <div class="mini-grid">
+        <div class="mini-stat"><span>Itens em estoque</span><strong id="s-itens">-</strong></div>
+        <div class="mini-stat"><span>Valor em estoque</span><strong id="s-valor">-</strong></div>
+        <div class="mini-stat"><span>Estoque baixo</span><strong id="s-baixo">-</strong></div>
+        <div class="mini-stat"><span>Sem estoque</span><strong id="s-zerado">-</strong></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-head">
+        <h2>Catalogo por categoria</h2>
+      </div>
+      <div id="categorias" class="bar-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-head">
+        <h2>Estoque baixo</h2>
+        <span id="estoque-alerta"></span>
+      </div>
+      <table>
+        <thead><tr><th>Produto</th><th>Estoque</th><th>Minimo</th></tr></thead>
+        <tbody id="estoque-baixo"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="section-head">
+        <h2>Clientes recentes</h2>
+        <a href="/clientes/">Ver clientes</a>
+      </div>
+      <table>
+        <thead><tr><th>Nome</th><th>CPF</th><th>E-mail</th></tr></thead>
+        <tbody id="clientes-recentes"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+  const MESES_DASH = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  const CATS_DASH = [["NOTEBOOK", "Notebooks"], ["COMPUTADOR", "Computadores"], ["PERIFERICO", "Perifericos"],
+    ["COMPONENTE", "Componentes"], ["MONITOR", "Monitores"], ["ARMAZENAMENTO", "Armazenamento"],
+    ["REDE", "Redes"], ["ACESSORIO", "Acessorios"], ["OUTROS", "Outros"]];
+  const rotuloCategoria = (v) => (CATS_DASH.find(c => c[0] === v) || ["", v || "Outros"])[1];
+  const numero = (v) => Number(v).toLocaleString("pt-BR");
+
+  function setQuickActions(open) {
+    const menu = document.getElementById("quick-actions");
+    const button = document.getElementById("add-action");
+    menu.classList.toggle("open", open);
+    button.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  function toggleQuickActions(event) {
+    event.stopPropagation();
+    const menu = document.getElementById("quick-actions");
+    setQuickActions(!menu.classList.contains("open"));
+  }
+
+  document.addEventListener("click", (event) => {
+    const menu = document.getElementById("quick-actions");
+    if (menu && !menu.contains(event.target)) setQuickActions(false);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") setQuickActions(false);
+  });
+
+  function vazio(colspan, texto) {
+    return `<tr class="muted-row"><td colspan="${colspan}">${texto}</td></tr>`;
+  }
+
+  function renderCategorias(produtos) {
+    const contagem = {};
+    produtos.forEach(p => contagem[p.categoria || "OUTROS"] = (contagem[p.categoria || "OUTROS"] || 0) + 1);
+    const linhas = Object.entries(contagem).sort((a, b) => b[1] - a[1]);
+    const maior = Math.max(...linhas.map(([, qtd]) => qtd), 1);
+    document.getElementById("categorias").innerHTML = linhas.map(([cat, qtd]) => `
+      <div class="bar-row">
+        <span>${rotuloCategoria(cat)}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${(qtd / maior) * 100}%"></div></div>
+        <strong>${qtd}</strong>
+      </div>`).join("") || `<span style="color:var(--muted)">Nenhum produto cadastrado.</span>`;
+  }
+
+  function renderGrafico(dados) {
+    if (!window.Chart) return;
+    new Chart(document.getElementById("grafico-dashboard"), {
+      type: "bar",
+      data: { labels: MESES_DASH, datasets: [{ data: dados.map(d => d.total), backgroundColor: "#ff751f", borderRadius: 6 }] },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { callback: v => money(v) } } },
+      },
+    });
+  }
+
+  async function carregarDashboard() {
+    try {
+      const agora = new Date();
+      const anoAtual = agora.getFullYear();
+      document.getElementById("ano-label").textContent = anoAtual;
+      const [clientes, produtos, vendas, estoqueBaixo, maisVendidos, anual] = await Promise.all([
+        api("/clientes/"),
+        api("/produtos/"),
+        api("/vendas/"),
+        api("/produtos/estoque-baixo/"),
+        api("/relatorios/mais-vendidos/"),
+        api(`/relatorios/vendas-anuais/?ano=${anoAtual}`),
+      ]);
+
+      const receitaTotal = vendas.reduce((s, v) => s + Number(v.valor_total), 0);
+      const ticketMedio = vendas.length ? receitaTotal / vendas.length : 0;
+      const itensEstoque = produtos.reduce((s, p) => s + Number(p.quantidade_estoque), 0);
+      const valorEstoque = produtos.reduce((s, p) => s + Number(p.preco) * Number(p.quantidade_estoque), 0);
+      const zerados = produtos.filter(p => Number(p.quantidade_estoque) === 0).length;
+      const mesAtual = agora.getMonth();
+      const vendasMes = vendas.filter(v => {
+        const data = new Date(v.data_venda);
+        return data.getMonth() === mesAtual && data.getFullYear() === anoAtual;
+      }).length;
+
+      document.getElementById("m-clientes").textContent = numero(clientes.length);
+      document.getElementById("m-produtos").textContent = numero(produtos.length);
+      document.getElementById("m-vendas").textContent = numero(vendas.length);
+      document.getElementById("m-receita").textContent = money(receitaTotal);
+      document.getElementById("n-clientes").textContent = clientes.length === 1 ? "cliente cadastrado" : "clientes cadastrados";
+      document.getElementById("n-produtos").textContent = `${numero(itensEstoque)} unidades no estoque`;
+      document.getElementById("n-vendas").textContent = `${numero(vendasMes)} vendas neste mes`;
+      document.getElementById("n-ticket").textContent = `${money(ticketMedio)} ticket medio`;
+
+      document.getElementById("s-itens").textContent = numero(itensEstoque);
+      document.getElementById("s-valor").textContent = money(valorEstoque);
+      document.getElementById("s-baixo").textContent = numero(estoqueBaixo.length);
+      document.getElementById("s-zerado").textContent = numero(zerados);
+      document.getElementById("estoque-alerta").textContent = estoqueBaixo.length ? "Atencao necessaria" : "Tudo em dia";
+
+      document.getElementById("vendas-recentes").innerHTML = vendas.slice(0, 6).map(v => `
+        <tr><td>${v.id}</td><td>${new Date(v.data_venda).toLocaleDateString("pt-br")}</td>
+        <td>${v.cliente_nome}</td><td>${v.itens.length}</td><td>${money(v.valor_total)}</td></tr>`).join("")
+        || vazio(5, "Ainda nao ha vendas registradas.");
+
+      document.getElementById("mais-vendidos").innerHTML = maisVendidos.produtos.map(p => `
+        <tr><td>${p.produto}</td><td>${p.marca}</td><td>${p.quantidade}</td><td>${money(p.receita)}</td></tr>`).join("")
+        || vazio(4, "Ainda nao ha produtos vendidos.");
+
+      document.getElementById("estoque-baixo").innerHTML = estoqueBaixo.slice(0, 6).map(p => `
+        <tr><td>${p.nome}</td><td>${p.quantidade_estoque}</td><td>${p.estoque_minimo}</td></tr>`).join("")
+        || vazio(3, "Nenhum produto no limite minimo.");
+
+      document.getElementById("clientes-recentes").innerHTML = clientes.slice(-5).reverse().map(c => `
+        <tr><td>${c.nome}</td><td>${c.cpf}</td><td>${c.email}</td></tr>`).join("")
+        || vazio(3, "Nenhum cliente cadastrado.");
+
+      renderCategorias(produtos);
+      renderGrafico(anual.dados);
+    } catch (err) {
+      toast(err.message, false);
+    }
+  }
+
+  requireAdmin().then(carregarDashboard).catch(() => {});
+</script>
+{% endblock %}
