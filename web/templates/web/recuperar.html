@@ -1,0 +1,58 @@
+{% extends "web/base.html" %}
+{% load static %}                {# Habilita {% static %} para carregar a logo #}
+{% block nav %}{% endblock %}   {# Pagina publica: sem barra de navegacao #}
+
+{% block body %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <img class="brand-logo" src="{% static 'web/logo.png' %}" alt="InfoControl">
+    <div class="sub">Recuperacao de senha</div>
+
+    <!-- Passo 1: informar o e-mail para receber o token -->
+    <form id="form-email">
+      <label>E-mail cadastrado</label>
+      <input id="email" type="email" required>
+      <button type="submit">Enviar instrucoes</button>
+    </form>
+
+    <!-- Passo 2: informar o token recebido e a nova senha -->
+    <form id="form-reset" style="margin-top:20px">
+      <label>UID (recebido por e-mail)</label>
+      <input id="uid" required>
+      <label>Token (recebido por e-mail)</label>
+      <input id="token" required>
+      <label>Nova senha</label>
+      <input id="nova" type="password" required>
+      <button type="submit">Redefinir senha</button>
+    </form>
+
+    <div class="alt"><a href="/">Voltar ao login</a></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  // Passo 1: solicita o envio do e-mail de recuperacao.
+  document.getElementById("form-email").onsubmit = async (e) => {
+    e.preventDefault();
+    const r = await api("/auth/recuperar-senha/", { method: "POST", body: JSON.stringify({ email: email.value }) });
+    toast(r.mensagem);
+  };
+
+  // Passo 2: envia uid + token + nova senha para concluir a redefinicao.
+  document.getElementById("form-reset").onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const r = await api("/auth/redefinir-senha/", {
+        method: "POST",
+        body: JSON.stringify({ uid: uid.value, token: token.value, nova_senha: nova.value }),
+      });
+      toast(r.mensagem);
+      setTimeout(() => (location.href = "/"), 1500);
+    } catch (err) {
+      toast(err.message, false);
+    }
+  };
+</script>
+{% endblock %}

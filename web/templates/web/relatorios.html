@@ -1,0 +1,138 @@
+{% extends "web/base.html" %}
+{# Pagina de relatorios: mostra os dados automaticamente ao abrir (sem botao "gerar"). #}
+
+{% block content %}
+<h1>Relatorios</h1>
+
+<style>
+  /* Estilos especificos desta pagina (cartoes de indicadores e cabecalho com filtros) */
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+  .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 18px 20px;
+         box-shadow: 0 1px 2px rgba(45,40,30,.04), 0 4px 16px rgba(45,40,30,.03); }
+  .kpi-label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .kpi-value { display: block; font-family: "Newsreader", Georgia, serif; font-size: 28px; margin-top: 6px; }
+  .card-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+  .card-head h2 { margin: 0; }
+  .card-head .filters { display: flex; gap: 12px; }
+  .card-head label { margin: 0 0 4px; }
+  .card-head input { width: auto; }
+  @media (max-width: 640px) { .kpis { grid-template-columns: 1fr; } }
+</style>
+
+<!-- Indicadores do periodo selecionado (atualizam sozinhos) -->
+<div class="kpis">
+  <div class="kpi"><span class="kpi-label">Total vendido</span><span class="kpi-value" id="kpi-total">—</span></div>
+  <div class="kpi"><span class="kpi-label">Vendas no periodo</span><span class="kpi-value" id="kpi-qtd">—</span></div>
+  <div class="kpi"><span class="kpi-label">Ticket medio</span><span class="kpi-value" id="kpi-ticket">—</span></div>
+</div>
+
+<!-- Grafico de vendas anuais -->
+<div class="card">
+  <div class="card-head">
+    <h2>Vendas anuais</h2>
+    <div><label>Ano</label><input id="ano" type="number"></div>
+  </div>
+  <canvas id="grafico" height="100"></canvas>
+</div>
+
+<!-- Lista de vendas por periodo -->
+<div class="card">
+  <div class="card-head">
+    <h2>Vendas por periodo</h2>
+    <div class="filters">
+      <div><label>Inicio</label><input id="inicio" type="date"></div>
+      <div><label>Fim</label><input id="fim" type="date"></div>
+    </div>
+  </div>
+  <table>
+    <thead><tr><th>ID</th><th>Data</th><th>Cliente</th><th>Total</th></tr></thead>
+    <tbody id="lista"></tbody>
+  </table>
+</div>
+
+<!-- Produtos mais vendidos (best-sellers) -->
+<div class="card">
+  <h2>Produtos mais vendidos</h2>
+  <table>
+    <thead><tr><th>Produto</th><th>Marca</th><th>Qtd vendida</th><th>Receita</th></tr></thead>
+    <tbody id="mais-vendidos"></tbody>
+  </table>
+</div>
+
+<!-- Produtos para repor (estoque no/abaixo do minimo) -->
+<div class="card">
+  <h2>Estoque baixo (reposicao)</h2>
+  <table>
+    <thead><tr><th>Produto</th><th>Marca</th><th>Estoque</th><th>Minimo</th></tr></thead>
+    <tbody id="estoque-baixo"></tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block script %}
+<!-- Biblioteca de graficos (CDN) para a representacao grafica das vendas anuais -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+  requireAuth();
+  const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  let chart;
+
+  // Formata uma data para o padrao YYYY-MM-DD usando o fuso local (evita erro de 1 dia).
+  const dataLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  // Atualiza os indicadores e a lista de vendas do periodo selecionado.
+  async function carregarPeriodo() {
+    const r = await api(`/relatorios/vendas/?inicio=${inicio.value}&fim=${fim.value}`);
+    const ticket = r.quantidade_vendas ? r.total_vendido / r.quantidade_vendas : 0;
+    document.getElementById("kpi-total").textContent = money(r.total_vendido);
+    document.getElementById("kpi-qtd").textContent = r.quantidade_vendas;
+    document.getElementById("kpi-ticket").textContent = money(ticket);
+    lista.innerHTML = r.vendas.map(v => `
+      <tr><td>${v.id}</td><td>${new Date(v.data_venda).toLocaleDateString("pt-br")}</td>
+      <td>${v.cliente_nome}</td><td>${money(v.valor_total)}</td></tr>`).join("")
+      || `<tr><td colspan="4" style="color:var(--muted)">Nenhuma venda no periodo.</td></tr>`;
+  }
+
+  // Desenha (ou redesenha) o grafico de barras com o total vendido em cada mes do ano.
+  async function carregarAnual() {
+    const r = await api(`/relatorios/vendas-anuais/?ano=${ano.value}`);
+    if (chart) chart.destroy();   // Remove o grafico anterior antes de redesenhar
+    chart = new Chart(grafico, {
+      type: "bar",
+      data: { labels: MESES, datasets: [{ label: "Vendas (R$)", data: r.dados.map(d => d.total), backgroundColor: "#ff751f", borderRadius: 6 }] },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+    });
+  }
+
+  // Lista os produtos campeoes de venda (best-sellers).
+  async function carregarMaisVendidos() {
+    const r = await api("/relatorios/mais-vendidos/");
+    document.getElementById("mais-vendidos").innerHTML = r.produtos.map(p => `
+      <tr><td>${p.produto}</td><td>${p.marca}</td><td>${p.quantidade}</td><td>${money(p.receita)}</td></tr>`).join("")
+      || `<tr><td colspan="4" style="color:var(--muted)">Ainda nao ha vendas.</td></tr>`;
+  }
+
+  // Lista os produtos que precisam de reposicao (estoque no/abaixo do minimo).
+  async function carregarEstoqueBaixo() {
+    const itens = await api("/produtos/estoque-baixo/");
+    document.getElementById("estoque-baixo").innerHTML = itens.map(p => `
+      <tr><td>${p.nome}</td><td>${p.marca || "-"}</td><td>${p.quantidade_estoque}</td><td>${p.estoque_minimo}</td></tr>`).join("")
+      || `<tr><td colspan="4" style="color:var(--muted)">Nenhum produto em falta.</td></tr>`;
+  }
+
+  // Preenche os filtros com o ano atual e ja carrega tudo ao abrir a pagina.
+  (function iniciar() {
+    const hoje = new Date();
+    ano.value = hoje.getFullYear();
+    inicio.value = `${hoje.getFullYear()}-01-01`;   // Comeco do ano atual
+    fim.value = dataLocal(hoje);                     // Hoje
+    carregarPeriodo();
+    carregarAnual();
+    carregarMaisVendidos();
+    carregarEstoqueBaixo();
+    // Recarrega automaticamente quando qualquer filtro muda (sem botao).
+    inicio.onchange = fim.onchange = carregarPeriodo;
+    ano.onchange = carregarAnual;
+  })();
+</script>
+{% endblock %}

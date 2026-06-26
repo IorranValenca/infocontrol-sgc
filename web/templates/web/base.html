@@ -1,0 +1,215 @@
+{% load static %}   {# Permite usar {% static %} para carregar a logo e outros arquivos estaticos #}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InfoControl</title>
+
+  <!-- Fonte serifada (ar editorial, estilo Anthropic/Claude) usada nos titulos -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
+
+  <style>
+    /* ---- Identidade visual: laranja da logo + tons quentes e suaves (estilo Anthropic/Claude) ---- */
+    :root {
+      --primary: #ff751f;        /* laranja da logo (acao principal) */
+      --primary-dark: #e25c0b;   /* laranja escuro (hover) */
+      --bg: #f0eee6;             /* fundo creme/off-white (canvas) */
+      --card: #ffffff;           /* cartoes brancos sobre o creme */
+      --text: #2b2a27;           /* quase-preto quente */
+      --muted: #6e6a60;          /* taupe para textos secundarios */
+      --border: #e7e2d6;         /* bordas suaves e quentes */
+      --hover: #f6f2ea;          /* realce suave (linhas, botoes ghost) */
+      --danger: #c0392b; --ok: #3d8a5f;   /* erro e sucesso (levemente dessaturados) */
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, "Segoe UI", Arial, sans-serif; line-height: 1.5;
+      background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--primary); text-decoration: none; }
+    /* Titulos com fonte serifada: o "ar" editorial do Claude */
+    h1, h2, .card h2 { font-family: "Newsreader", Georgia, serif; font-weight: 500; letter-spacing: -.01em; }
+
+    /* Barra de navegacao: fixa no topo e levemente translucida */
+    nav {
+      position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,.82); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    }
+    nav .inner { max-width: 960px; margin: 0 auto; display: flex; align-items: center; gap: 22px; padding: 0 24px; height: 62px; }
+    nav .logo { height: 30px; display: block; }                          /* logo (imagem) na barra de navegacao */
+    .brand-logo { display: block; height: 50px; margin: 0 auto 10px; }   /* logo nas telas de login/recuperacao */
+    nav a.link { color: var(--muted); font-weight: 500; font-size: 14px; padding: 6px 4px; transition: color .15s; }
+    nav a.link:hover { color: var(--text); }
+    nav .right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+    nav #userinfo { color: var(--muted); font-size: 14px; }
+
+    /* Conteudo */
+    .container { max-width: 960px; margin: 32px auto; padding: 0 24px; }
+    h1 { font-size: 30px; margin-bottom: 22px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-bottom: 20px;
+      box-shadow: 0 1px 2px rgba(45,40,30,.04), 0 4px 16px rgba(45,40,30,.03);
+    }
+    .card h2 { font-size: 19px; margin-bottom: 16px; }
+
+    /* Formularios */
+    label { display: block; font-size: 13px; font-weight: 500; color: var(--muted); margin: 10px 0 5px; }
+    input, select {
+      width: 100%; padding: 10px 13px; border: 1px solid var(--border); border-radius: 10px;
+      font-size: 14px; font-family: inherit; color: var(--text); background: #fff; transition: border-color .15s, box-shadow .15s;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(255,117,31,.15); }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .row > div { flex: 1; min-width: 150px; }
+
+    /* Botoes */
+    button {
+      cursor: pointer; border: 1px solid transparent; border-radius: 10px; padding: 10px 18px;
+      font-size: 14px; font-weight: 600; font-family: inherit; background: var(--primary); color: #fff; transition: all .15s;
+    }
+    button:hover { background: var(--primary-dark); }
+    button.ghost { background: #fff; color: var(--text); border-color: var(--border); }
+    button.ghost:hover { background: var(--hover); }
+    button.danger { background: var(--danger); }
+    button.danger:hover { background: #a4322a; }
+    button.sm { padding: 6px 12px; font-size: 13px; }
+
+    /* Tabelas */
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 12px 12px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    tbody tr { transition: background .15s; }
+    tbody tr:hover { background: var(--hover); }
+    tr:last-child td { border-bottom: 0; }
+    .badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 99px; background: #e7efe6; color: #3d7a55; }
+    .badge.alerta { background: #f6e2dd; color: var(--danger); }
+
+    /* Mensagens (toast) */
+    #toast { position: fixed; bottom: 24px; right: 24px; padding: 13px 20px; border-radius: 12px; color: #fff; font-size: 14px; box-shadow: 0 8px 24px rgba(45,40,30,.18); opacity: 0; transform: translateY(10px); transition: .25s; pointer-events: none; }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.ok { background: var(--ok); }  #toast.err { background: var(--danger); }
+
+    /* Cartao de detalhes (abre com animacao suave ao clicar em um item da lista) */
+    tr.clickable { cursor: pointer; }
+    .modal-overlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px;
+      background: rgba(40,35,28,.45); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+      opacity: 0; visibility: hidden; transition: opacity .22s ease, visibility .22s ease; }
+    .modal-overlay.open { opacity: 1; visibility: visible; }
+    .modal-card { position: relative; background: var(--card); border: 1px solid var(--border); border-radius: 18px;
+      padding: 28px; width: 440px; max-width: 100%; max-height: 85vh; overflow: auto; box-shadow: 0 24px 60px rgba(40,35,28,.25);
+      opacity: 0; transform: translateY(16px) scale(.96); transition: opacity .26s ease, transform .26s cubic-bezier(.2,.8,.2,1); }
+    .modal-overlay.open .modal-card { opacity: 1; transform: translateY(0) scale(1); }   /* estado final da animacao */
+    .modal-card h2 { font-size: 22px; margin-bottom: 16px; padding-right: 28px; }
+    .modal-close { position: absolute; top: 14px; right: 16px; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px;
+      background: transparent; color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer; }
+    .modal-close:hover { background: var(--hover); color: var(--text); }
+    .detail-row { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .detail-row:last-child { border-bottom: 0; }
+    .detail-row .k { color: var(--muted); }
+    .detail-row .v { font-weight: 500; text-align: right; }
+
+    /* Tela de login/recuperacao: fundo creme com um brilho quente suave */
+    .auth-wrap { min-height: 100vh; display: grid; place-items: center; padding: 20px;
+      background: radial-gradient(1100px 520px at 50% -8%, #ffe7d2, transparent), var(--bg); }
+    .auth-card { background: #fff; border: 1px solid var(--border); border-radius: 20px; padding: 40px; width: 370px;
+      box-shadow: 0 18px 50px rgba(80,60,40,.14); }
+    .auth-card .sub { text-align: center; color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+    .auth-card button { width: 100%; margin-top: 20px; }
+    .auth-card .alt { text-align: center; margin-top: 18px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  {% block nav %}
+  <nav>
+    <div class="inner">
+      <a href="/clientes/"><img class="logo" src="{% static 'web/logo.png' %}" alt="InfoControl"></a>
+      <a class="link" href="/clientes/">Clientes</a>
+      <a class="link" href="/produtos/">Produtos</a>
+      <a class="link" href="/vendas/">Vendas</a>
+      <a class="link" href="/relatorios/">Relatorios</a>
+      <div class="right">
+        <span id="userinfo"></span>
+        <button class="ghost sm" onclick="logout()">Sair</button>
+      </div>
+    </div>
+  </nav>
+  {% endblock %}
+
+  {% block body %}<main class="container">{% block content %}{% endblock %}</main>{% endblock %}
+
+  <!-- Cartao de detalhes (preenchido via JavaScript ao clicar em um item) -->
+  <div id="modal" class="modal-overlay" onclick="closeCard()">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeCard()" aria-label="Fechar">&times;</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    /* ---- Funcoes compartilhadas por todas as telas ---- */
+    const API = "/api";
+    const KEY = "infocontrol_token";
+    const KEY_CART = "infocontrol_carrinho";                   // Carrinho da venda em andamento
+    const getToken = () => localStorage.getItem(KEY);          // Le o token salvo
+    const setToken = (t) => localStorage.setItem(KEY, t);      // Salva o token apos o login
+    const clearToken = () => localStorage.removeItem(KEY);     // Remove o token (logout)
+    // Formata valores no padrao monetario brasileiro (ex.: R$ 18.000,00, com separador de milhar).
+    const money = (v) => Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+    // Faz uma requisicao a API, injetando o token JWT e padronizando os erros.
+    async function api(path, options = {}) {
+      options.headers = Object.assign({ "Content-Type": "application/json" }, options.headers);
+      if (getToken()) options.headers["Authorization"] = "Bearer " + getToken();
+      const resp = await fetch(API + path, options);
+      if (resp.status === 401) { clearToken(); location.href = "/"; return; }  // Sessao expirada
+      const data = resp.status === 204 ? {} : await resp.json();
+      if (!resp.ok) throw new Error(data.erro || "Erro na requisicao.");
+      return data;
+    }
+
+    // Redireciona para o login quando nao ha usuario autenticado.
+    function requireAuth() { if (!getToken()) location.href = "/"; }
+
+    // Encerra a sessao do usuario (e descarta o carrinho em andamento).
+    function logout() { clearToken(); localStorage.removeItem(KEY_CART); location.href = "/"; }
+
+    // Exibe uma mensagem rapida no canto da tela.
+    function toast(msg, ok = true) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.className = "show " + (ok ? "ok" : "err");
+      setTimeout(() => (t.className = ""), 3000);
+    }
+
+    // ---- Cartao de detalhes (modal com animacao), compartilhado por todas as telas ----
+    // Monta uma linha "rotulo / valor" do cartao de detalhes.
+    const linha = (rotulo, valor) => `<div class="detail-row"><span class="k">${rotulo}</span><span class="v">${valor ?? "-"}</span></div>`;
+
+    // Abre o cartao preenchido com o HTML informado (dispara a animacao de entrada).
+    function showCard(html) {
+      document.getElementById("modal-body").innerHTML = html;
+      document.getElementById("modal").classList.add("open");
+    }
+
+    // Fecha o cartao de detalhes.
+    function closeCard() { document.getElementById("modal").classList.remove("open"); }
+
+    // Fecha o cartao ao pressionar a tecla Esc.
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeCard(); });
+
+    // Mostra o nome e o perfil do usuario logado na barra de navegacao.
+    (async () => {
+      const box = document.getElementById("userinfo");
+      if (box && getToken()) {
+        try { const u = await api("/auth/me/"); box.textContent = u.username + " · " + u.perfil; } catch (e) {}
+      }
+    })();
+  </script>
+  {% block script %}{% endblock %}
+</body>
+</html>

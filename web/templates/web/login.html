@@ -1,0 +1,47 @@
+{% extends "web/base.html" %}
+{% load static %}                {# Habilita {% static %} para carregar a logo #}
+{% block nav %}{% endblock %}   {# A tela de login nao exibe a barra de navegacao #}
+
+{% block body %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <img class="brand-logo" src="{% static 'web/logo.png' %}" alt="InfoControl">
+    <div class="sub">Sistema de Gestao Comercial</div>
+
+    <form id="form">
+      <label>Usuario</label>
+      <input id="username" required autofocus>
+      <label>Senha</label>
+      <input id="senha" type="password" required>
+      <button type="submit">Entrar</button>
+    </form>
+
+    <div class="alt"><a href="/recuperar/">Esqueci minha senha</a></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  // Ja autenticado? Vai direto para o sistema.
+  if (getToken()) location.href = "/clientes/";
+
+  // Envia usuario e senha para /api/auth/login/ e guarda o token retornado.
+  document.getElementById("form").onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const data = await api("/auth/login/", {
+        method: "POST",
+        body: JSON.stringify({
+          username: username.value,
+          password: senha.value,
+        }),
+      });
+      setToken(data.access);          // Guarda o token JWT no navegador
+      location.href = "/clientes/";   // Entra no sistema
+    } catch (err) {
+      toast("Usuario ou senha invalidos.", false);
+    }
+  };
+</script>
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends "web/base.html" %}
+{# Tela de clientes: cadastra, edita, lista e remove clientes consumindo /api/clientes/. #}
+
+{% block content %}
+<h1>Clientes</h1>
+
+<!-- Formulario de cadastro/edicao -->
+<div class="card">
+  <h2 id="form-titulo">Novo cliente</h2>
+  <form id="form">
+    <input type="hidden" id="id">
+    <div class="row">
+      <div><label>Nome</label><input id="nome" required></div>
+      <div><label>CPF</label><input id="cpf" required></div>
+    </div>
+    <div class="row">
+      <div><label>E-mail</label><input id="email" type="email" required></div>
+      <div><label>Telefone</label><input id="telefone"></div>
+    </div>
+    <label>Endereco</label><input id="endereco">
+    <div style="margin-top:16px; display:flex; gap:10px">
+      <button type="submit">Salvar</button>
+      <button type="button" class="ghost" onclick="limpar()">Limpar</button>
+    </div>
+  </form>
+</div>
+
+<!-- Lista de clientes -->
+<div class="card">
+  <h2>Clientes cadastrados</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Nome</th><th>CPF</th><th>E-mail</th><th>Telefone</th><th></th></tr></thead>
+    <tbody id="lista"></tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  requireAuth();
+  let clientes = [];   // Clientes carregados (usado pelo cartao de detalhes e pela edicao)
+
+  // Carrega a lista de clientes da API e monta a tabela (clicar na linha abre o cartao).
+  async function carregar() {
+    clientes = await api("/clientes/");
+    lista.innerHTML = clientes.map(c => `
+      <tr class="clickable" onclick="verCliente(${c.id})">
+        <td>${c.id}</td><td>${c.nome}</td><td>${c.cpf}</td><td>${c.email}</td><td>${c.telefone || "-"}</td>
+        <td style="white-space:nowrap">
+          <button class="ghost sm" onclick="event.stopPropagation(); editar(${c.id})">Editar</button>
+          <button class="danger sm" onclick="event.stopPropagation(); remover(${c.id})">Excluir</button>
+        </td>
+      </tr>`).join("");
+  }
+
+  // Mostra os detalhes do cliente em um cartao animado.
+  function verCliente(cid) {
+    const c = clientes.find(x => x.id === cid);
+    showCard(`<h2>${c.nome}</h2>
+      ${linha("CPF", c.cpf)}
+      ${linha("E-mail", c.email)}
+      ${linha("Telefone", c.telefone || "-")}
+      ${linha("Endereco", c.endereco || "-")}`);
+  }
+
+  // Salva (cria com POST ou atualiza com PUT, conforme exista um id).
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const corpo = JSON.stringify({ nome: nome.value, cpf: cpf.value, email: email.value, telefone: telefone.value, endereco: endereco.value });
+    try {
+      if (id.value) await api(`/clientes/${id.value}/`, { method: "PUT", body: corpo });
+      else await api("/clientes/", { method: "POST", body: corpo });
+      toast("Cliente salvo com sucesso.");
+      limpar(); carregar();
+    } catch (err) { toast(err.message, false); }
+  };
+
+  // Preenche o formulario com os dados de um cliente para edicao.
+  function editar(cid) {
+    const c = clientes.find(x => x.id === cid);
+    id.value = c.id; nome.value = c.nome; cpf.value = c.cpf;
+    email.value = c.email; telefone.value = c.telefone || ""; endereco.value = c.endereco || "";
+    document.getElementById("form-titulo").textContent = "Editar cliente";
+  }
+
+  // Remove um cliente (a API bloqueia se ele tiver vendas).
+  async function remover(id) {
+    if (!confirm("Excluir este cliente?")) return;
+    try { await api(`/clientes/${id}/`, { method: "DELETE" }); toast("Cliente removido."); carregar(); }
+    catch (err) { toast(err.message, false); }
+  }
+
+  // Limpa o formulario e volta ao modo de cadastro.
+  function limpar() {
+    form.reset(); id.value = "";
+    document.getElementById("form-titulo").textContent = "Novo cliente";
+  }
+
+  carregar();
+</script>
+{% endblock %}

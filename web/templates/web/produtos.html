@@ -1,0 +1,158 @@
+{% extends "web/base.html" %}
+{# Catalogo da loja de informatica: cadastro de produtos com marca, categoria e garantia + busca/filtro. #}
+
+{% block content %}
+<h1>Produtos</h1>
+
+<style>
+  /* Cabecalho do catalogo (titulo + busca + filtro de categoria) */
+  .cat-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; flex-wrap: wrap; }
+  .cat-head h2 { margin: 0; }
+  .cat-head .filters { display: flex; gap: 10px; }
+  .cat-head input, .cat-head select { width: auto; }
+</style>
+
+<!-- Formulario de cadastro/edicao -->
+<div class="card">
+  <h2 id="form-titulo">Novo produto</h2>
+  <form id="form">
+    <input type="hidden" id="id">
+    <div class="row">
+      <div><label>Nome</label><input id="nome" required></div>
+      <div><label>Marca</label><input id="marca" placeholder="Dell, Logitech, AMD..."></div>
+    </div>
+    <div class="row">
+      <div><label>Categoria</label><select id="categoria"></select></div>
+      <div><label>Preco (R$)</label><input id="preco" type="number" step="0.01" min="0" required></div>
+    </div>
+    <div class="row">
+      <div><label>Estoque</label><input id="estoque" type="number" min="0" value="0" required></div>
+      <div><label>Estoque minimo</label><input id="minimo" type="number" min="0" value="0" required></div>
+      <div><label>Garantia (meses)</label><input id="garantia" type="number" min="0" value="12"></div>
+    </div>
+    <label>Descricao</label><input id="descricao">
+    <div style="margin-top:16px; display:flex; gap:10px">
+      <button type="submit">Salvar</button>
+      <button type="button" class="ghost" onclick="limpar()">Limpar</button>
+    </div>
+  </form>
+</div>
+
+<!-- Catalogo (com busca e filtro por categoria) -->
+<div class="card">
+  <div class="cat-head">
+    <h2>Catalogo</h2>
+    <div class="filters">
+      <input id="busca" placeholder="Buscar por nome ou marca...">
+      <select id="filtro-cat"></select>
+    </div>
+  </div>
+  <table>
+    <thead><tr><th>Nome</th><th>Marca</th><th>Categoria</th><th>Preco</th><th>Estoque</th><th>Garantia</th><th>Status</th><th></th></tr></thead>
+    <tbody id="lista"></tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  requireAuth();
+
+  // Categorias do catalogo (valor enviado a API + rotulo exibido). Espelha o modelo Produto.
+  const CATS = [["NOTEBOOK", "Notebooks"], ["COMPUTADOR", "Computadores"], ["PERIFERICO", "Perifericos"],
+    ["COMPONENTE", "Componentes"], ["MONITOR", "Monitores"], ["ARMAZENAMENTO", "Armazenamento"],
+    ["REDE", "Redes"], ["ACESSORIO", "Acessorios"], ["OUTROS", "Outros"]];
+  const rotuloCat = (v) => (CATS.find(c => c[0] === v) || ["", v])[1];   // Codigo -> nome amigavel
+
+  let todos = [];   // Todos os produtos carregados (a tabela mostra os filtrados)
+
+  // Monta as opcoes do select do formulario e do filtro a partir de CATS.
+  function montarSelects() {
+    categoria.innerHTML = CATS.map(c => `<option value="${c[0]}">${c[1]}</option>`).join("");
+    document.getElementById("filtro-cat").innerHTML =
+      `<option value="">Todas as categorias</option>` + CATS.map(c => `<option value="${c[0]}">${c[1]}</option>`).join("");
+  }
+
+  // Busca os produtos na API e desenha a tabela.
+  async function carregar() {
+    todos = await api("/produtos/");
+    render();
+  }
+
+  // Aplica a busca por texto e o filtro de categoria, e monta as linhas da tabela.
+  function render() {
+    const termo = busca.value.toLowerCase();
+    const cat = document.getElementById("filtro-cat").value;
+    const itens = todos.filter(p =>
+      (!cat || p.categoria === cat) &&
+      (p.nome + " " + (p.marca || "")).toLowerCase().includes(termo));
+    lista.innerHTML = itens.map(p => `
+      <tr class="clickable" onclick="verProduto(${p.id})">
+        <td>${p.nome}</td><td>${p.marca || "-"}</td><td>${rotuloCat(p.categoria)}</td>
+        <td>${money(p.preco)}</td><td>${p.quantidade_estoque}</td><td>${p.garantia_meses} m</td>
+        <td>${p.estoque_baixo ? '<span class="badge alerta">Estoque baixo</span>' : '<span class="badge">OK</span>'}</td>
+        <td style="white-space:nowrap">
+          <button class="ghost sm" onclick="event.stopPropagation(); editar(${p.id})">Editar</button>
+          <button class="danger sm" onclick="event.stopPropagation(); remover(${p.id})">Excluir</button>
+        </td>
+      </tr>`).join("") || `<tr><td colspan="8" style="color:var(--muted)">Nenhum produto encontrado.</td></tr>`;
+  }
+
+  // Mostra os detalhes do produto em um cartao animado.
+  function verProduto(pid) {
+    const p = todos.find(x => x.id === pid);
+    const status = p.estoque_baixo ? '<span class="badge alerta">Estoque baixo</span>' : '<span class="badge">OK</span>';
+    showCard(`<h2>${p.nome}</h2>
+      ${linha("Marca", p.marca || "-")}
+      ${linha("Categoria", rotuloCat(p.categoria))}
+      ${linha("Preco", money(p.preco))}
+      ${linha("Estoque", p.quantidade_estoque + " un.")}
+      ${linha("Estoque minimo", p.estoque_minimo + " un.")}
+      ${linha("Garantia", p.garantia_meses + " meses")}
+      ${linha("Status", status)}
+      ${p.descricao ? linha("Descricao", p.descricao) : ""}`);
+  }
+
+  // Cria (POST) ou atualiza (PUT) um produto conforme exista um id.
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const corpo = JSON.stringify({
+      nome: nome.value, marca: marca.value, categoria: categoria.value, descricao: descricao.value,
+      preco: preco.value, quantidade_estoque: estoque.value, estoque_minimo: minimo.value, garantia_meses: garantia.value,
+    });
+    try {
+      if (id.value) await api(`/produtos/${id.value}/`, { method: "PUT", body: corpo });
+      else await api("/produtos/", { method: "POST", body: corpo });
+      toast("Produto salvo com sucesso.");
+      limpar(); carregar();
+    } catch (err) { toast(err.message, false); }
+  };
+
+  // Preenche o formulario para edicao.
+  function editar(pid) {
+    const p = todos.find(x => x.id === pid);
+    id.value = p.id; nome.value = p.nome; marca.value = p.marca || ""; categoria.value = p.categoria;
+    preco.value = p.preco; estoque.value = p.quantidade_estoque; minimo.value = p.estoque_minimo;
+    garantia.value = p.garantia_meses; descricao.value = p.descricao || "";
+    document.getElementById("form-titulo").textContent = "Editar produto";
+  }
+
+  // Remove um produto (a API bloqueia se ele estiver em vendas).
+  async function remover(id) {
+    if (!confirm("Excluir este produto?")) return;
+    try { await api(`/produtos/${id}/`, { method: "DELETE" }); toast("Produto removido."); carregar(); }
+    catch (err) { toast(err.message, false); }
+  }
+
+  // Limpa o formulario e volta ao modo de cadastro.
+  function limpar() {
+    form.reset(); id.value = "";
+    document.getElementById("form-titulo").textContent = "Novo produto";
+  }
+
+  montarSelects();
+  busca.oninput = render;                                    // Busca em tempo real
+  document.getElementById("filtro-cat").onchange = render;   // Filtro por categoria
+  carregar();
+</script>
+{% endblock %}

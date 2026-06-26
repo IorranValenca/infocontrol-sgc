@@ -1,0 +1,127 @@
+{% extends "web/base.html" %}
+{# Tela de vendas: monta o carrinho (cliente + itens) e registra a venda em /api/vendas/. #}
+
+{% block content %}
+<h1>Vendas</h1>
+
+<!-- Registro de uma nova venda -->
+<div class="card">
+  <h2>Registrar venda</h2>
+  <label>Cliente</label>
+  <select id="cliente"></select>
+
+  <div class="row" style="margin-top:12px; align-items:flex-end">
+    <div style="flex:2"><label>Produto</label><select id="produto"></select></div>
+    <div><label>Quantidade</label><input id="qtd" type="number" min="1" value="1"></div>
+    <div style="flex:0"><button type="button" onclick="adicionar()">Adicionar</button></div>
+  </div>
+
+  <!-- Itens adicionados (carrinho temporario no navegador) -->
+  <table style="margin-top:16px">
+    <thead><tr><th>Produto</th><th>Qtd</th><th>Preco</th><th>Subtotal</th><th></th></tr></thead>
+    <tbody id="itens"></tbody>
+  </table>
+
+  <div style="margin-top:16px; display:flex; justify-content:space-between; align-items:center">
+    <strong id="total">Total: R$ 0,00</strong>
+    <button type="button" onclick="finalizar()">Finalizar venda</button>
+  </div>
+</div>
+
+<!-- Historico de vendas -->
+<div class="card">
+  <h2>Vendas registradas</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Data</th><th>Cliente</th><th>Itens</th><th>Total</th></tr></thead>
+    <tbody id="lista"></tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  requireAuth();
+
+  let produtos = [];   // Produtos disponiveis (para consultar preco/estoque)
+  // Recupera o carrinho salvo no navegador (mantem os itens ao sair e voltar a pagina).
+  let carrinho = JSON.parse(localStorage.getItem(KEY_CART) || "[]");
+  let vendasReg = [];   // Vendas ja registradas (usado pelo cartao de detalhes)
+
+  // Carrega clientes e produtos nos campos de selecao.
+  async function init() {
+    const clientes = await api("/clientes/");
+    cliente.innerHTML = clientes.map(c => `<option value="${c.id}">${c.nome}</option>`).join("");
+    produtos = await api("/produtos/");
+    produto.innerHTML = produtos.map(p => `<option value="${p.id}">${p.nome}${p.marca ? " · " + p.marca : ""} — ${money(p.preco)} (estoque ${p.quantidade_estoque})</option>`).join("");
+    desenharCarrinho();   // Mostra o carrinho recuperado (caso tenha saido sem finalizar)
+    listarVendas();
+  }
+
+  // Adiciona o produto selecionado ao carrinho.
+  function adicionar() {
+    const p = produtos.find(x => x.id == produto.value);
+    const quantidade = parseInt(qtd.value);
+    if (!p || quantidade < 1) return;
+    carrinho.push({ produto_id: p.id, nome: p.nome, quantidade, preco: Number(p.preco) });
+    desenharCarrinho();
+  }
+
+  // Remove um item do carrinho pelo indice.
+  function removerItem(i) { carrinho.splice(i, 1); desenharCarrinho(); }
+
+  // Redesenha a tabela do carrinho, atualiza o total e salva o carrinho no navegador.
+  function desenharCarrinho() {
+    itens.innerHTML = carrinho.map((it, i) => `
+      <tr>
+        <td>${it.nome}</td><td>${it.quantidade}</td><td>${money(it.preco)}</td>
+        <td>${money(it.preco * it.quantidade)}</td>
+        <td><button class="danger sm" onclick="removerItem(${i})">x</button></td>
+      </tr>`).join("");
+    const t = carrinho.reduce((s, it) => s + it.preco * it.quantidade, 0);
+    total.textContent = "Total: " + money(t);
+    localStorage.setItem(KEY_CART, JSON.stringify(carrinho));   // Persiste para nao perder ao trocar de tela
+  }
+
+  // Envia a venda para a API (cliente + itens) e limpa o carrinho.
+  async function finalizar() {
+    if (!carrinho.length) return toast("Adicione ao menos um item.", false);
+    try {
+      await api("/vendas/", {
+        method: "POST",
+        body: JSON.stringify({
+          cliente_id: cliente.value,
+          itens: carrinho.map(it => ({ produto_id: it.produto_id, quantidade: it.quantidade })),
+        }),
+      });
+      toast("Venda registrada com sucesso.");
+      carrinho = []; desenharCarrinho(); init();   // Recarrega para atualizar o estoque
+    } catch (err) { toast(err.message, false); }
+  }
+
+  // Lista as vendas ja registradas (clicar na linha abre o cartao com os itens).
+  async function listarVendas() {
+    vendasReg = await api("/vendas/");
+    lista.innerHTML = vendasReg.map(v => `
+      <tr class="clickable" onclick="verVenda(${v.id})">
+        <td>${v.id}</td><td>${new Date(v.data_venda).toLocaleDateString("pt-br")}</td>
+        <td>${v.cliente_nome}</td><td>${v.itens.length}</td><td>${money(v.valor_total)}</td>
+      </tr>`).join("");
+  }
+
+  // Mostra os detalhes da venda (cliente, vendedor e itens) em um cartao animado.
+  function verVenda(vid) {
+    const v = vendasReg.find(x => x.id === vid);
+    const itensHtml = v.itens.map(it =>
+      `<div class="detail-row"><span class="k">${it.quantidade}x ${it.produto_nome}</span><span class="v">${money(it.subtotal)}</span></div>`).join("");
+    showCard(`<h2>Venda #${v.id}</h2>
+      ${linha("Data", new Date(v.data_venda).toLocaleString("pt-br"))}
+      ${linha("Cliente", v.cliente_nome)}
+      ${linha("Vendedor", v.usuario_nome)}
+      <div style="margin:16px 0 4px; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em">Itens</div>
+      ${itensHtml}
+      ${linha("<strong>Total</strong>", "<strong>" + money(v.valor_total) + "</strong>")}`);
+  }
+
+  init();
+</script>
+{% endblock %}

@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.pyc
+
+# Ambiente virtual
+venv/
+.venv/
+
+# Banco de dados local (gerado pelo migrate)
+db.sqlite3
